@@ -1,0 +1,87 @@
+
+
+networks:
+  api-portal-net:
+    driver: bridge
+
+volumes:
+  db_data:
+  keycloak_data:
+
+services:
+
+  # ─────────────────────────────────────────
+  #  Backend Application (Spring Boot)
+  # ─────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: apiportal-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/apiportal
+      SPRING_DATASOURCE_USERNAME: apiportal
+      SPRING_DATASOURCE_PASSWORD: apiportal123
+      SPRING_FLYWAY_ENABLED: "false"
+      KEYCLOAK_URL: http://keycloak:8080
+    networks:
+      - api-portal-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────
+  #  PostgreSQL (Single-tenant database)
+  # ─────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: apiportal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: apiportal
+      POSTGRES_USER: apiportal
+      POSTGRES_PASSWORD: apiportal123
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    #  - ./infra/postgres/V1__complete_schema.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - api-portal-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apiportal -d apiportal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  #  Keycloak (IAM)
+  # ─────────────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: apiportal-keycloak
+    restart: unless-stopped
+    command: start-dev
+    environment:
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin123
+    ports:
+      - "8180:8080"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+    networks:
+      - api-portal-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
