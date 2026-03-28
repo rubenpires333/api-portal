@@ -99,6 +99,14 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- ── DEVTOOLS (Hot Reload para desenvolvimento) ────── -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+
         <!-- ── AOP (para logs, multitenancy, etc.) ──────────── -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -42,7 +42,7 @@ services:
     container_name: apiportal-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: apiportal
+      POSTGRES_DB: db_portal_api
       POSTGRES_USER: apiportal
       POSTGRES_PASSWORD: apiportal123
     ports:
