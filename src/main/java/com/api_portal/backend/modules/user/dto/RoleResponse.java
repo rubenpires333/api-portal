@@ -37,4 +37,18 @@ public class RoleResponse {
         private String resource;
         private String action;
     }
+    
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UserInfo {
+        private UUID id;
+        private String email;
+        private String username;
+        private String firstName;
+        private String lastName;
+        private Boolean active;
+        private LocalDateTime lastLogin;
+    }
 }

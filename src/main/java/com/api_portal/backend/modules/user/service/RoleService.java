@@ -8,9 +8,6 @@ import com.api_portal.backend.modules.user.repository.PermissionRepository;
 import com.api_portal.backend.modules.user.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.CachePut;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,7 +26,6 @@ public class RoleService {
     private final PermissionRepository permissionRepository;
     
     @Transactional
-    @CacheEvict(value = "roles", allEntries = true)
     public RoleResponse createRole(RoleRequest request) {
         log.info("Criando role: {}", request.getName());
         
@@ -61,7 +57,6 @@ public class RoleService {
     }
     
     @Transactional(readOnly = true)
-    @Cacheable(value = "roles", key = "'all'")
     public List<RoleResponse> getAllRoles() {
         return roleRepository.findAll()
             .stream()
@@ -70,7 +65,6 @@ public class RoleService {
     }
     
     @Transactional(readOnly = true)
-    @Cacheable(value = "roles", key = "#id")
     public RoleResponse getRoleById(UUID id) {
         Role role = roleRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Role não encontrada"));
@@ -78,9 +72,25 @@ public class RoleService {
         return mapToResponse(role);
     }
     
+    @Transactional(readOnly = true)
+    public List<RoleResponse.UserInfo> getRoleUsers(UUID id) {
+        Role role = roleRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Role não encontrada"));
+        
+        return role.getUsers().stream()
+            .map(user -> RoleResponse.UserInfo.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .username(user.getUsername())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .active(user.getActive())
+                .lastLogin(user.getLastLoginAt())
+                .build())
+            .collect(Collectors.toList());
+    }
+    
     @Transactional
-    @CachePut(value = "roles", key = "#id")
-    @CacheEvict(value = "roles", key = "'all'")
     public RoleResponse updateRole(UUID id, RoleRequest request) {
         log.info("Atualizando role: {}", id);
         
@@ -115,7 +125,6 @@ public class RoleService {
     }
     
     @Transactional
-    @CacheEvict(value = "roles", allEntries = true)
     public void deleteRole(UUID id) {
         log.info("Deletando role: {}", id);
         

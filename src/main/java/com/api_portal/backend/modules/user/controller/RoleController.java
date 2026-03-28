@@ -48,6 +48,13 @@ public class RoleController {
         return ResponseEntity.ok(role);
     }
     
+    @GetMapping("/{id}/users")
+    @Operation(summary = "Listar usuários de uma role")
+    public ResponseEntity<List<RoleResponse.UserInfo>> getRoleUsers(@PathVariable UUID id) {
+        List<RoleResponse.UserInfo> users = roleService.getRoleUsers(id);
+        return ResponseEntity.ok(users);
+    }
+    
     @PutMapping("/{id}")
     @RequiresPermission("role.manage")
     @Operation(summary = "Atualizar role")
