@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -171,7 +170,6 @@ public class UserService {
     }
     
     @Transactional(readOnly = true)
-    @Cacheable(value = "users", key = "#id")
     public UserResponse getUserById(UUID id) {
         User user = userRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
@@ -180,7 +178,6 @@ public class UserService {
     }
     
     @Transactional(readOnly = true)
-    @Cacheable(value = "users", key = "'keycloak:' + #keycloakId")
     public UserResponse getUserByKeycloakId(String keycloakId) {
         User user = userRepository.findByKeycloakId(keycloakId)
             .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
