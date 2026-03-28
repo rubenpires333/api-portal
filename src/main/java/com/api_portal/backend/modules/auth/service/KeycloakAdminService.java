@@ -33,7 +33,7 @@ public class KeycloakAdminService {
     @Value("${keycloak.admin.password:admin123}")
     private String adminPassword;
     
-    public void createUser(RegisterRequest request) {
+    public String createUser(RegisterRequest request) {
         try {
             String adminToken = getAdminToken();
             String userUrl = String.format("%s/admin/realms/%s/users", keycloakUrl, realm);
@@ -99,8 +99,11 @@ public class KeycloakAdminService {
                     // Adicionar usuário ao grupo
                     log.info("Adicionando usuário {} ao grupo {}", userId, role);
                     addUserToGroup(userId, role, adminToken);
+                    
+                    log.info("Utilizador criado com sucesso: {} com role {}", request.getEmail(), role);
+                    return userId; // Retornar o userId
                 }
-                log.info("Utilizador criado com sucesso: {} com role {}", request.getEmail(), role);
+                throw new AuthException("Falha ao obter ID do utilizador criado");
             } else {
                 throw new AuthException("Falha ao criar utilizador no Keycloak");
             }
@@ -467,6 +470,83 @@ public class KeycloakAdminService {
         } catch (Exception e) {
             log.error("Erro ao obter informações do utilizador: {}", e.getMessage());
             throw new AuthException("Erro ao obter informações do utilizador", e);
+        }
+    }
+    
+    /**
+     * Envia email de verificação para o usuário
+     */
+    public void sendVerificationEmail(String userId) {
+        try {
+            String adminToken = getAdminToken();
+            String verifyEmailUrl = String.format(
+                "%s/admin/realms/%s/users/%s/send-verify-email", 
+                keycloakUrl, realm, userId
+            );
+            
+            // Adicionar redirect_uri como query parameter
+            String redirectUri = "http://localhost:4200/auth/email-verified";
+            verifyEmailUrl += "?redirect_uri=" + redirectUri;
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(adminToken);
+            
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            
+            ResponseEntity<String> response = restTemplate.exchange(
+                verifyEmailUrl,
+                HttpMethod.PUT,
+                entity,
+                String.class
+            );
+            
+            if (response.getStatusCode() == HttpStatus.NO_CONTENT || 
+                response.getStatusCode() == HttpStatus.OK) {
+                log.info("Email de verificação enviado para o usuário: {}", userId);
+            } else {
+                log.warn("Resposta inesperada ao enviar email de verificação: {}", response.getStatusCode());
+            }
+            
+        } catch (Exception e) {
+            log.error("Erro ao enviar email de verificação: {}", e.getMessage());
+            throw new AuthException("Erro ao enviar email de verificação", e);
+        }
+    }
+    
+    /**
+     * Verifica o email do usuário manualmente (para quando o link do email não funcionar)
+     */
+    public void verifyEmail(String userId) {
+        try {
+            String adminToken = getAdminToken();
+            String userUrl = String.format("%s/admin/realms/%s/users/%s", keycloakUrl, realm, userId);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(adminToken);
+            
+            Map<String, Object> userUpdate = new HashMap<>();
+            userUpdate.put("emailVerified", true);
+            
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(userUpdate, headers);
+            
+            ResponseEntity<String> response = restTemplate.exchange(
+                userUrl,
+                HttpMethod.PUT,
+                entity,
+                String.class
+            );
+            
+            if (response.getStatusCode() == HttpStatus.NO_CONTENT || 
+                response.getStatusCode() == HttpStatus.OK) {
+                log.info("Email verificado manualmente para o usuário: {}", userId);
+            } else {
+                log.warn("Resposta inesperada ao verificar email: {}", response.getStatusCode());
+            }
+            
+        } catch (Exception e) {
+            log.error("Erro ao verificar email: {}", e.getMessage());
+            throw new AuthException("Erro ao verificar email", e);
         }
     }
 } 

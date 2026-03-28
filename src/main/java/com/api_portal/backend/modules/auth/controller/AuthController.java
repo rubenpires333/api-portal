@@ -207,4 +207,37 @@ public class AuthController {
         TokenResponse response = authService.processOAuthCallback(authCode, ipAddress);
         return ResponseEntity.ok(response);
     }
+    
+    @GetMapping("/verify-email")
+    @Operation(
+        summary = "Verificar email",
+        description = "Verifica o email do utilizador através do token enviado por email"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Email verificado com sucesso"),
+        @ApiResponse(responseCode = "400", description = "Token inválido ou expirado")
+    })
+    public ResponseEntity<String> verifyEmail(
+            @RequestParam String token,
+            @RequestParam(required = false) String userId) {
+        
+        // O Keycloak processa o token automaticamente
+        // Este endpoint é apenas para redirecionar o usuário após a verificação
+        return ResponseEntity.ok("Email verificado com sucesso! Você pode fechar esta janela.");
+    }
+    
+    @PostMapping("/resend-verification")
+    @Operation(
+        summary = "Reenviar email de verificação",
+        description = "Reenvia o email de verificação para o utilizador autenticado",
+        security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Email de verificação reenviado"),
+        @ApiResponse(responseCode = "401", description = "Não autenticado")
+    })
+    public ResponseEntity<String> resendVerificationEmail() {
+        authService.resendVerificationEmail();
+        return ResponseEntity.ok("Email de verificação enviado");
+    }
 }

@@ -149,8 +149,17 @@ public class AuthService {
     
     public TokenResponse register(RegisterRequest request, String ipAddress) {
         try {
-            // Criar usuário no Keycloak
-            keycloakAdminService.createUser(request);
+            // Criar usuário no Keycloak e obter o userId
+            String userId = keycloakAdminService.createUser(request);
+            
+            // Enviar email de verificação
+            try {
+                keycloakAdminService.sendVerificationEmail(userId);
+                log.info("Email de verificação enviado para: {}", request.getEmail());
+            } catch (Exception e) {
+                log.warn("Erro ao enviar email de verificação: {}", e.getMessage());
+                // Não falhar o registro se o email não puder ser enviado
+            }
             
             // Fazer login automático após registro
             LoginRequest loginRequest = new LoginRequest();
@@ -438,5 +447,30 @@ public class AuthService {
             return new ArrayList<>();
         }
     }
+    
+    /**
+     * Reenvia email de verificação para o usuário autenticado
+     */
+    public void resendVerificationEmail() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            
+            if (authentication == null || !(authentication.getPrincipal() instanceof Jwt)) {
+                throw new AuthException("Utilizador não autenticado");
+            }
+            
+            Jwt jwt = (Jwt) authentication.getPrincipal();
+            String userId = jwt.getSubject();
+            
+            keycloakAdminService.sendVerificationEmail(userId);
+            log.info("Email de verificação reenviado para o usuário: {}", userId);
+            
+        } catch (AuthException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Erro ao reenviar email de verificação: {}", e.getMessage());
+            throw new AuthException("Erro ao reenviar email de verificação", e);
+        }
+    }
 }
- 
+    
