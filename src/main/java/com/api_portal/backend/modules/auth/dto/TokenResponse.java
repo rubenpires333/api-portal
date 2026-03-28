@@ -24,4 +24,22 @@ public class TokenResponse {
     
     @Schema(description = "Tempo de expiração em segundos", example = "3600")
     private Long expiresIn;
+    
+    @Schema(description = "Informações do usuário autenticado")
+    private UserInfo user;
+    
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UserInfo {
+        private String id;
+        private String email;
+        private String username;
+        private String firstName;
+        private String lastName;
+        private java.util.List<String> roles;
+        private java.util.List<String> permissions;
+    }
 }
+

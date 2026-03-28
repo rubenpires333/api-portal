@@ -14,6 +14,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -123,7 +125,7 @@ public class AuthController {
         AuthUserResponse response = authService.updateUserInfo(
             request.getName(),
             request.getEmail(),
-            request.getPhone(),
+            request.getPhone(), 
             request.getCompany(),
             request.getJobTitle()
         );
@@ -134,5 +136,75 @@ public class AuthController {
     @Operation(summary = "Health check", description = "Verifica se o módulo de autenticação está ativo")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("Auth module is running");
+    }
+    
+    @PostMapping("/logout")
+    @Operation(
+        summary = "Logout do utilizador",
+        description = "Invalida o token JWT no Keycloak e remove a sessão",
+        security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Logout realizado com sucesso"),
+        @ApiResponse(responseCode = "401", description = "Token inválido")
+    })
+    public ResponseEntity<String> logout(
+            @RequestBody(required = false) Map<String, String> body,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        
+        // Tentar obter refresh token do body primeiro, depois do header
+        String refreshToken = null;
+        
+        if (body != null && body.containsKey("refreshToken")) {
+            refreshToken = body.get("refreshToken");
+        } else if (body != null && body.containsKey("refresh_token")) {
+            refreshToken = body.get("refresh_token");
+        } else if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            refreshToken = authHeader.substring(7);
+        }
+        
+        if (refreshToken != null) {
+            authService.logout(refreshToken);
+        }
+        
+        return ResponseEntity.ok("Logout realizado com sucesso");
+    }
+    
+    @PostMapping("/oauth2/callback")
+    @Operation(
+        summary = "Callback OAuth2",
+        description = "Processa o callback do Keycloak após autenticação social (Google, GitHub)"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Autenticação OAuth2 realizada com sucesso"),
+        @ApiResponse(responseCode = "400", description = "Código inválido ou ausente"),
+        @ApiResponse(responseCode = "500", description = "Erro ao processar OAuth2")
+    })
+    public ResponseEntity<TokenResponse> oauthCallback(
+            @RequestBody(required = false) Map<String, String> body,
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String error,
+            @RequestParam(required = false) String error_description,
+            HttpServletRequest httpRequest) {
+        
+        // Se houver erro do provider OAuth
+        if (error != null) {
+            throw new RuntimeException("OAuth error: " + error + " - " + error_description);
+        }
+        
+        // Tentar obter código do body ou query parameter
+        String authCode = code;
+        if (authCode == null && body != null) {
+            authCode = body.get("code");
+        }
+        
+        // Se não houver código, retornar erro
+        if (authCode == null || authCode.isEmpty()) {
+            throw new RuntimeException("Authorization code is required");
+        }
+        
+        String ipAddress = httpRequest.getRemoteAddr();
+        TokenResponse response = authService.processOAuthCallback(authCode, ipAddress);
+        return ResponseEntity.ok(response);
     }
 }

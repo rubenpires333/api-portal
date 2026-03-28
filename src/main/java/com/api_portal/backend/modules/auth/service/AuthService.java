@@ -69,9 +69,21 @@ public class AuthService {
                 String accessToken = (String) responseBody.get("access_token");
                 
                 // Decodificar o token e sincronizar usuário
+                TokenResponse.UserInfo userInfo = null;
                 try {
                     Jwt jwt = jwtDecoder.decode(accessToken);
                     syncUserFromJwt(jwt, ipAddress);
+                    
+                    // Extrair informações do usuário do JWT
+                    userInfo = TokenResponse.UserInfo.builder()
+                        .id(jwt.getSubject())
+                        .email(jwt.getClaimAsString("email"))
+                        .username(jwt.getClaimAsString("preferred_username"))
+                        .firstName(jwt.getClaimAsString("given_name"))
+                        .lastName(jwt.getClaimAsString("family_name"))
+                        .roles(extractRoles(jwt))
+                        .permissions(new ArrayList<>()) // TODO: extrair permissões se necessário
+                        .build();
                 } catch (Exception e) {
                     log.warn("Erro ao sincronizar usuário após login: {}", e.getMessage());
                 }
@@ -81,6 +93,7 @@ public class AuthService {
                     .refreshToken((String) responseBody.get("refresh_token"))
                     .tokenType("Bearer")
                     .expiresIn(((Number) responseBody.get("expires_in")).longValue())
+                    .user(userInfo)
                     .build();
             }
             
@@ -149,6 +162,113 @@ public class AuthService {
         } catch (Exception e) {
             log.error("Erro ao registrar utilizador: {}", e.getMessage());
             throw new AuthException("Erro ao registrar utilizador: " + e.getMessage(), e);
+        }
+    }
+    
+    public TokenResponse processOAuthCallback(String code, String ipAddress) {
+        try {
+            log.info("Processando callback OAuth2 com código: {}", code.substring(0, Math.min(10, code.length())) + "...");
+            
+            String tokenUrl = String.format("%s/realms/%s/protocol/openid-connect/token", 
+                keycloakUrl, realm);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            
+            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+            body.add("grant_type", "authorization_code");
+            body.add("client_id", clientId);
+            body.add("client_secret", clientSecret);
+            body.add("code", code);
+            body.add("redirect_uri", "http://localhost:4200/auth/callback");
+            
+            HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(body, headers);
+            
+            ResponseEntity<Map> response = restTemplate.exchange(
+                tokenUrl, 
+                HttpMethod.POST, 
+                entity, 
+                Map.class
+            );
+            
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                Map<String, Object> responseBody = response.getBody();
+                String accessToken = (String) responseBody.get("access_token");
+                
+                // Decodificar o token e sincronizar usuário
+                TokenResponse.UserInfo userInfo = null;
+                try {
+                    Jwt jwt = jwtDecoder.decode(accessToken);
+                    syncUserFromJwt(jwt, ipAddress);
+                    
+                    // Extrair informações do usuário do JWT
+                    userInfo = TokenResponse.UserInfo.builder()
+                        .id(jwt.getSubject())
+                        .email(jwt.getClaimAsString("email"))
+                        .username(jwt.getClaimAsString("preferred_username"))
+                        .firstName(jwt.getClaimAsString("given_name"))
+                        .lastName(jwt.getClaimAsString("family_name"))
+                        .roles(extractRoles(jwt))
+                        .permissions(new ArrayList<>())
+                        .build();
+                } catch (Exception e) {
+                    log.warn("Erro ao sincronizar usuário após OAuth: {}", e.getMessage());
+                }
+                
+                return TokenResponse.builder()
+                    .accessToken(accessToken)
+                    .refreshToken((String) responseBody.get("refresh_token"))
+                    .tokenType("Bearer")
+                    .expiresIn(((Number) responseBody.get("expires_in")).longValue())
+                    .user(userInfo)
+                    .build();
+            }
+            
+            throw new AuthException("Falha ao processar callback OAuth2");
+            
+        } catch (Exception e) {
+            log.error("Erro ao processar callback OAuth2: {}", e.getMessage(), e);
+            throw new AuthException("Erro ao processar autenticação OAuth2", e);
+        }
+    }
+    
+    public void logout(String refreshToken) {
+        try {
+            if (refreshToken == null || refreshToken.isEmpty()) {
+                log.warn("Tentativa de logout sem refresh token");
+                return;
+            }
+            
+            String logoutUrl = String.format("%s/realms/%s/protocol/openid-connect/logout", 
+                keycloakUrl, realm);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            
+            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+            body.add("client_id", clientId);
+            body.add("client_secret", clientSecret);
+            body.add("refresh_token", refreshToken);
+            
+            HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(body, headers);
+            
+            ResponseEntity<String> response = restTemplate.exchange(
+                logoutUrl, 
+                HttpMethod.POST, 
+                entity, 
+                String.class
+            );
+            
+            if (response.getStatusCode() == HttpStatus.NO_CONTENT || 
+                response.getStatusCode() == HttpStatus.OK) {
+                log.info("Logout realizado com sucesso no Keycloak");
+            } else {
+                log.warn("Resposta inesperada do Keycloak no logout: {}", response.getStatusCode());
+            }
+            
+        } catch (Exception e) {
+            log.error("Erro ao fazer logout no Keycloak: {}", e.getMessage());
+            // Não lançar exceção para não bloquear o logout no frontend
         }
     }
     
