@@ -70,23 +70,21 @@ public class AuthService {
                 
                 // Decodificar o token e sincronizar usuário
                 TokenResponse.UserInfo userInfo = null;
-                try {
-                    Jwt jwt = jwtDecoder.decode(accessToken);
-                    syncUserFromJwt(jwt, ipAddress);
-                    
-                    // Extrair informações do usuário do JWT
-                    userInfo = TokenResponse.UserInfo.builder()
-                        .id(jwt.getSubject())
-                        .email(jwt.getClaimAsString("email"))
-                        .username(jwt.getClaimAsString("preferred_username"))
-                        .firstName(jwt.getClaimAsString("given_name"))
-                        .lastName(jwt.getClaimAsString("family_name"))
-                        .roles(extractRoles(jwt))
-                        .permissions(new ArrayList<>()) // TODO: extrair permissões se necessário
-                        .build();
-                } catch (Exception e) {
-                    log.warn("Erro ao sincronizar usuário após login: {}", e.getMessage());
-                }
+                Jwt jwt = jwtDecoder.decode(accessToken);
+                
+                // Sincronizar e validar usuário (lança exceção se inativo)
+                syncUserFromJwt(jwt, ipAddress);
+                
+                // Extrair informações do usuário do JWT
+                userInfo = TokenResponse.UserInfo.builder()
+                    .id(jwt.getSubject())
+                    .email(jwt.getClaimAsString("email"))
+                    .username(jwt.getClaimAsString("preferred_username"))
+                    .firstName(jwt.getClaimAsString("given_name"))
+                    .lastName(jwt.getClaimAsString("family_name"))
+                    .roles(extractRoles(jwt))
+                    .permissions(new ArrayList<>())
+                    .build();
                 
                 return TokenResponse.builder()
                     .accessToken(accessToken)
@@ -99,6 +97,9 @@ public class AuthService {
             
             throw new AuthException("Falha ao autenticar com Keycloak");
             
+        } catch (AuthException e) {
+            // Propagar AuthException sem modificar a mensagem
+            throw e;
         } catch (Exception e) {
             log.error("Erro ao fazer login: {}", e.getMessage());
             throw new AuthException("Credenciais inválidas", e);
@@ -206,23 +207,21 @@ public class AuthService {
                 
                 // Decodificar o token e sincronizar usuário
                 TokenResponse.UserInfo userInfo = null;
-                try {
-                    Jwt jwt = jwtDecoder.decode(accessToken);
-                    syncUserFromJwt(jwt, ipAddress);
-                    
-                    // Extrair informações do usuário do JWT
-                    userInfo = TokenResponse.UserInfo.builder()
-                        .id(jwt.getSubject())
-                        .email(jwt.getClaimAsString("email"))
-                        .username(jwt.getClaimAsString("preferred_username"))
-                        .firstName(jwt.getClaimAsString("given_name"))
-                        .lastName(jwt.getClaimAsString("family_name"))
-                        .roles(extractRoles(jwt))
-                        .permissions(new ArrayList<>())
-                        .build();
-                } catch (Exception e) {
-                    log.warn("Erro ao sincronizar usuário após OAuth: {}", e.getMessage());
-                }
+                Jwt jwt = jwtDecoder.decode(accessToken);
+                
+                // Sincronizar e validar usuário (lança exceção se inativo)
+                syncUserFromJwt(jwt, ipAddress);
+                
+                // Extrair informações do usuário do JWT
+                userInfo = TokenResponse.UserInfo.builder()
+                    .id(jwt.getSubject())
+                    .email(jwt.getClaimAsString("email"))
+                    .username(jwt.getClaimAsString("preferred_username"))
+                    .firstName(jwt.getClaimAsString("given_name"))
+                    .lastName(jwt.getClaimAsString("family_name"))
+                    .roles(extractRoles(jwt))
+                    .permissions(new ArrayList<>())
+                    .build();
                 
                 return TokenResponse.builder()
                     .accessToken(accessToken)
@@ -235,6 +234,9 @@ public class AuthService {
             
             throw new AuthException("Falha ao processar callback OAuth2");
             
+        } catch (AuthException e) {
+            // Propagar AuthException sem modificar a mensagem
+            throw e;
         } catch (Exception e) {
             log.error("Erro ao processar callback OAuth2: {}", e.getMessage(), e);
             throw new AuthException("Erro ao processar autenticação OAuth2", e);
@@ -403,13 +405,23 @@ public class AuthService {
                 roleCodes
             );
             
+            // Verificar se o usuário está ativo
+            if (!user.getActive()) {
+                log.warn("Tentativa de login de usuário inativo: {} ({})", email, keycloakId);
+                throw new AuthException("Sua conta está inativa. Entre em contato com o administrador.");
+            }
+            
             // Atualizar último login
             if (ipAddress != null && user.getId() != null) {
                 userService.updateLastLogin(user.getId(), ipAddress);
             }
             
+        } catch (AuthException e) {
+            // Propagar exceção de autenticação
+            throw e;
         } catch (Exception e) {
             log.error("Erro ao sincronizar usuário do JWT: {}", e.getMessage(), e);
+            throw new AuthException("Erro ao processar autenticação", e);
         }
     }
     

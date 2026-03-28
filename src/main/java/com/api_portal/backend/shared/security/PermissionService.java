@@ -127,21 +127,38 @@ public class PermissionService {
             String keycloakId = getCurrentUserKeycloakId();
             
             if (keycloakId == null) {
+                log.warn("❌ isSuperAdmin: keycloakId é null");
                 return false;
             }
+            
+            log.debug("🔍 Verificando SUPER_ADMIN para keycloakId: {}", keycloakId);
             
             User user = userRepository.findByKeycloakId(keycloakId)
                 .orElse(null);
             
             if (user == null) {
+                log.warn("❌ isSuperAdmin: Usuário não encontrado no banco para keycloakId: {}", keycloakId);
                 return false;
             }
             
-            return user.getRoles().stream()
+            log.debug("👤 Usuário encontrado: {} ({})", user.getEmail(), user.getId());
+            log.debug("📋 Roles do usuário: {}", user.getRoles().stream()
+                .map(Role::getCode)
+                .collect(Collectors.toList()));
+            
+            boolean isSuperAdmin = user.getRoles().stream()
                 .anyMatch(role -> "SUPER_ADMIN".equals(role.getCode()) && role.getActive());
+            
+            if (isSuperAdmin) {
+                log.debug("✅ Usuário é SUPER_ADMIN");
+            } else {
+                log.warn("❌ Usuário NÃO é SUPER_ADMIN");
+            }
+            
+            return isSuperAdmin;
                 
         } catch (Exception e) {
-            log.error("Erro ao verificar SUPER_ADMIN: {}", e.getMessage());
+            log.error("❌ Erro ao verificar SUPER_ADMIN: {}", e.getMessage(), e);
             return false;
         }
     }

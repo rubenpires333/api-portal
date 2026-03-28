@@ -59,6 +59,12 @@ public class KeycloakSyncService {
             roleCodes
         );
         
+        // Verificar se o usuário está ativo
+        if (!user.getActive()) {
+            log.warn("Tentativa de acesso de usuário inativo: {} ({})", email, keycloakId);
+            throw new RuntimeException("Sua conta está inativa. Entre em contato com o administrador.");
+        }
+        
         // Atualizar último login
         if (ipAddress != null) {
             userService.updateLastLogin(user.getId(), ipAddress);

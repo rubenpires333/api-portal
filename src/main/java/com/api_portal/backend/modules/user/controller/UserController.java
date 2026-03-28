@@ -203,4 +203,95 @@ public class UserController {
         
         return ResponseEntity.ok(debug);
     }
+    
+    @PostMapping("/debug/assign-super-admin")
+    @Operation(summary = "Debug - Atribuir role SUPER_ADMIN a todos os usuários (TEMPORÁRIO)")
+    public ResponseEntity<Map<String, Object>> assignSuperAdminToAll() {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            Role superAdminRole = roleRepository.findByCode("SUPER_ADMIN")
+                .orElseThrow(() -> new RuntimeException("Role SUPER_ADMIN não encontrada"));
+            
+            List<User> users = userRepository.findAll();
+            int assigned = 0;
+            
+            for (User user : users) {
+                if (!user.getRoles().contains(superAdminRole)) {
+                    user.getRoles().add(superAdminRole);
+                    userRepository.save(user);
+                    assigned++;
+                }
+            }
+            
+            result.put("status", "SUCCESS");
+            result.put("message", "Role SUPER_ADMIN atribuída com sucesso");
+            result.put("totalUsers", users.size());
+            result.put("usersAssigned", assigned);
+            result.put("usersAlreadyHadRole", users.size() - assigned);
+            
+        } catch (Exception e) {
+            result.put("status", "ERROR");
+            result.put("error", e.getMessage());
+        }
+        
+        return ResponseEntity.ok(result);
+    }
+    
+    @PostMapping("/me/force-sync")
+    @Operation(summary = "Forçar sincronização do usuário atual com Keycloak")
+    public ResponseEntity<Map<String, Object>> forceSyncCurrentUser(
+            Authentication authentication,
+            HttpServletRequest request) {
+        
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            String keycloakId = keycloakSyncService.extractKeycloakId(authentication);
+            String ipAddress = request.getRemoteAddr();
+            
+            // Adicionar informações do JWT para debug
+            if (authentication != null && authentication.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt) {
+                org.springframework.security.oauth2.jwt.Jwt jwt = (org.springframework.security.oauth2.jwt.Jwt) authentication.getPrincipal();
+                result.put("jwtClaims", jwt.getClaims().keySet());
+                result.put("jwtSubject", jwt.getSubject());
+                result.put("jwtEmail", jwt.getClaimAsString("email"));
+                
+                // Tentar extrair realm_access
+                Map<String, Object> realmAccess = jwt.getClaim("realm_access");
+                if (realmAccess != null) {
+                    result.put("realmAccess", realmAccess);
+                }
+                
+                // Tentar extrair resource_access
+                Map<String, Object> resourceAccess = jwt.getClaim("resource_access");
+                if (resourceAccess != null) {
+                    result.put("resourceAccess", resourceAccess);
+                }
+            }
+            
+            // Sincronizar usuário do Keycloak
+            User user = keycloakSyncService.syncUserFromToken(authentication, ipAddress);
+            
+            if (user != null) {
+                result.put("status", "SUCCESS");
+                result.put("message", "Usuário sincronizado com sucesso");
+                result.put("userId", user.getId());
+                result.put("email", user.getEmail());
+                result.put("rolesCount", user.getRoles().size());
+                result.put("roles", user.getRoles().stream()
+                    .map(Role::getCode)
+                    .collect(Collectors.toList()));
+            } else {
+                result.put("status", "ERROR");
+                result.put("message", "Falha ao sincronizar usuário");
+            }
+            
+        } catch (Exception e) {
+            result.put("status", "ERROR");
+            result.put("error", e.getMessage());
+        }
+        
+        return ResponseEntity.ok(result);
+    }
 }

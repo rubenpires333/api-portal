@@ -39,8 +39,21 @@ public class UserService {
         log.info("=== Iniciando createOrUpdateUser para: {} ===", email);
         log.info("Roles do JWT: {}", roleCodes);
         
+        // Buscar por keycloakId primeiro
         User user = userRepository.findByKeycloakId(keycloakId)
             .orElse(null);
+        
+        // Se não encontrar por keycloakId, buscar por email (pode ser usuário antigo)
+        if (user == null) {
+            user = userRepository.findByEmail(email)
+                .orElse(null);
+            
+            // Se encontrou por email, atualizar o keycloakId
+            if (user != null) {
+                log.info("Usuário encontrado por email, atualizando keycloakId");
+                user.setKeycloakId(keycloakId);
+            }
+        }
         
         boolean isNewUser = (user == null);
         log.info("Usuário é novo? {}", isNewUser);
