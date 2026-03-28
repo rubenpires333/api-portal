@@ -2,6 +2,7 @@ package com.api_portal.backend.modules.audit.controller;
 
 import com.api_portal.backend.modules.audit.domain.AuditLog;
 import com.api_portal.backend.modules.audit.service.AuditService;
+import com.api_portal.backend.shared.security.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,7 +13,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -22,14 +22,14 @@ import java.util.UUID;
 @RequestMapping("/api/v1/audit")
 @RequiredArgsConstructor
 @Tag(name = "Audit", description = "Logs de auditoria do sistema")
+@RequiresPermission("audit.read")
 public class AuditController {
     
     private final AuditService auditService;
     
     @GetMapping
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(
-        summary = "Listar todos os logs de auditoria (apenas ADMIN)",
+        summary = "Listar todos os logs de auditoria",
         security = @SecurityRequirement(name = "Bearer Authentication")
     )
     public ResponseEntity<Page<AuditLog>> getAllLogs(
@@ -38,9 +38,8 @@ public class AuditController {
     }
     
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(
-        summary = "Obter log por ID (apenas ADMIN)",
+        summary = "Obter log por ID",
         security = @SecurityRequirement(name = "Bearer Authentication")
     )
     public ResponseEntity<AuditLog> getLogById(@PathVariable UUID id) {
@@ -49,9 +48,8 @@ public class AuditController {
     }
     
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(
-        summary = "Listar logs por usuário (apenas ADMIN)",
+        summary = "Listar logs por usuário",
         security = @SecurityRequirement(name = "Bearer Authentication")
     )
     public ResponseEntity<Page<AuditLog>> getLogsByUser(
@@ -61,9 +59,8 @@ public class AuditController {
     }
     
     @GetMapping("/endpoint")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(
-        summary = "Listar logs por endpoint (apenas ADMIN)",
+        summary = "Listar logs por endpoint",
         security = @SecurityRequirement(name = "Bearer Authentication")
     )
     public ResponseEntity<Page<AuditLog>> getLogsByEndpoint(
@@ -73,9 +70,8 @@ public class AuditController {
     }
     
     @GetMapping("/period")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(
-        summary = "Listar logs por período (apenas ADMIN)",
+        summary = "Listar logs por período",
         security = @SecurityRequirement(name = "Bearer Authentication")
     )
     public ResponseEntity<Page<AuditLog>> getLogsByPeriod(

@@ -3,6 +3,7 @@ package com.api_portal.backend.modules.api.controller;
 import com.api_portal.backend.modules.api.dto.ApiEndpointRequest;
 import com.api_portal.backend.modules.api.dto.ApiEndpointResponse;
 import com.api_portal.backend.modules.api.service.ApiEndpointService;
+import com.api_portal.backend.shared.security.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,7 +11,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -39,7 +39,7 @@ public class ApiEndpointController {
     }
     
     @PostMapping
-    @PreAuthorize("hasAnyRole('PROVIDER', 'SUPER_ADMIN')")
+    @RequiresPermission("endpoint.create")
     @Operation(
         summary = "Criar novo endpoint",
         security = @SecurityRequirement(name = "Bearer Authentication")
@@ -54,7 +54,7 @@ public class ApiEndpointController {
     }
     
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'SUPER_ADMIN')")
+    @RequiresPermission("endpoint.update")
     @Operation(
         summary = "Atualizar endpoint",
         security = @SecurityRequirement(name = "Bearer Authentication")
@@ -68,7 +68,7 @@ public class ApiEndpointController {
     }
     
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'SUPER_ADMIN')")
+    @RequiresPermission("endpoint.delete")
     @Operation(
         summary = "Deletar endpoint",
         security = @SecurityRequirement(name = "Bearer Authentication")

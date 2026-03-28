@@ -3,6 +3,7 @@ package com.api_portal.backend.modules.api.controller;
 import com.api_portal.backend.modules.api.dto.ApiCategoryRequest;
 import com.api_portal.backend.modules.api.dto.ApiCategoryResponse;
 import com.api_portal.backend.modules.api.service.ApiCategoryService;
+import com.api_portal.backend.shared.security.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,7 +11,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -37,9 +37,9 @@ public class ApiCategoryController {
     }
     
     @PostMapping
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @RequiresPermission("category.create")
     @Operation(
-        summary = "Criar nova categoria (apenas ADMIN)",
+        summary = "Criar nova categoria",
         security = @SecurityRequirement(name = "Bearer Authentication")
     )
     public ResponseEntity<ApiCategoryResponse> createCategory(@Valid @RequestBody ApiCategoryRequest request) {
@@ -48,9 +48,9 @@ public class ApiCategoryController {
     }
     
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @RequiresPermission("category.update")
     @Operation(
-        summary = "Atualizar categoria (apenas ADMIN)",
+        summary = "Atualizar categoria",
         security = @SecurityRequirement(name = "Bearer Authentication")
     )
     public ResponseEntity<ApiCategoryResponse> updateCategory(
@@ -60,9 +60,9 @@ public class ApiCategoryController {
     }
     
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @RequiresPermission("category.delete")
     @Operation(
-        summary = "Deletar categoria (apenas ADMIN)",
+        summary = "Deletar categoria",
         security = @SecurityRequirement(name = "Bearer Authentication")
     )
     public ResponseEntity<Void> deleteCategory(@PathVariable UUID id) {

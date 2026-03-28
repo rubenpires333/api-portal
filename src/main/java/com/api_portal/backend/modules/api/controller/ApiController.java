@@ -3,6 +3,7 @@ package com.api_portal.backend.modules.api.controller;
 import com.api_portal.backend.modules.api.dto.ApiRequest;
 import com.api_portal.backend.modules.api.dto.ApiResponse;
 import com.api_portal.backend.modules.api.service.ApiService;
+import com.api_portal.backend.shared.security.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,7 +15,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -58,7 +58,7 @@ public class ApiController {
     }
     
     @GetMapping("/my")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'SUPER_ADMIN')")
+    @RequiresPermission("api.read")
     @Operation(
         summary = "Listar minhas APIs",
         security = @SecurityRequirement(name = "Bearer Authentication")
@@ -69,7 +69,7 @@ public class ApiController {
     }
     
     @PostMapping
-    @PreAuthorize("hasAnyRole('PROVIDER', 'SUPER_ADMIN')")
+    @RequiresPermission("api.create")
     @Operation(
         summary = "Criar nova API",
         security = @SecurityRequirement(name = "Bearer Authentication")
@@ -87,7 +87,7 @@ public class ApiController {
     }
     
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'SUPER_ADMIN')")
+    @RequiresPermission("api.update")
     @Operation(
         summary = "Atualizar API",
         security = @SecurityRequirement(name = "Bearer Authentication")
@@ -101,7 +101,7 @@ public class ApiController {
     }
     
     @PatchMapping("/{id}/publish")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'SUPER_ADMIN')")
+    @RequiresPermission("api.publish")
     @Operation(
         summary = "Publicar API",
         security = @SecurityRequirement(name = "Bearer Authentication")
@@ -114,7 +114,7 @@ public class ApiController {
     }
     
     @PatchMapping("/{id}/deprecate")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'SUPER_ADMIN')")
+    @RequiresPermission("api.update")
     @Operation(
         summary = "Depreciar API",
         security = @SecurityRequirement(name = "Bearer Authentication")
@@ -127,7 +127,7 @@ public class ApiController {
     }
     
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'SUPER_ADMIN')")
+    @RequiresPermission("api.delete")
     @Operation(
         summary = "Deletar API",
         security = @SecurityRequirement(name = "Bearer Authentication")

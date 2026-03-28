@@ -61,6 +61,14 @@ public class SecurityConfig {
                     "/actuator/**",
                     "/error"
                 ).permitAll()
+                // Endpoints públicos de leitura (GET)
+                .requestMatchers(
+                    org.springframework.http.HttpMethod.GET,
+                    "/api/v1/categories",
+                    "/api/v1/categories/**",
+                    "/api/v1/apis",
+                    "/api/v1/apis/**"
+                ).permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2

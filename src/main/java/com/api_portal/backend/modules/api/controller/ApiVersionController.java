@@ -3,6 +3,7 @@ package com.api_portal.backend.modules.api.controller;
 import com.api_portal.backend.modules.api.dto.ApiVersionRequest;
 import com.api_portal.backend.modules.api.dto.ApiVersionResponse;
 import com.api_portal.backend.modules.api.service.ApiVersionService;
+import com.api_portal.backend.shared.security.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,7 +11,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -39,7 +39,7 @@ public class ApiVersionController {
     }
     
     @PostMapping
-    @PreAuthorize("hasAnyRole('PROVIDER', 'SUPER_ADMIN')")
+    @RequiresPermission("version.create")
     @Operation(
         summary = "Criar nova versão",
         security = @SecurityRequirement(name = "Bearer Authentication")
@@ -54,7 +54,7 @@ public class ApiVersionController {
     }
     
     @PatchMapping("/{id}/default")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'SUPER_ADMIN')")
+    @RequiresPermission("version.update")
     @Operation(
         summary = "Definir versão como padrão",
         security = @SecurityRequirement(name = "Bearer Authentication")
@@ -68,7 +68,7 @@ public class ApiVersionController {
     }
     
     @PatchMapping("/{id}/deprecate")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'SUPER_ADMIN')")
+    @RequiresPermission("version.update")
     @Operation(
         summary = "Depreciar versão",
         security = @SecurityRequirement(name = "Bearer Authentication")
@@ -82,7 +82,7 @@ public class ApiVersionController {
     }
     
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'SUPER_ADMIN')")
+    @RequiresPermission("version.delete")
     @Operation(
         summary = "Deletar versão",
         security = @SecurityRequirement(name = "Bearer Authentication")

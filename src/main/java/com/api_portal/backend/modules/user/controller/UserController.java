@@ -8,6 +8,7 @@ import com.api_portal.backend.modules.user.repository.RoleRepository;
 import com.api_portal.backend.modules.user.repository.UserRepository;
 import com.api_portal.backend.modules.user.service.KeycloakSyncService;
 import com.api_portal.backend.modules.user.service.UserService;
+import com.api_portal.backend.shared.security.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -66,16 +66,16 @@ public class UserController {
     }
     
     @GetMapping
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Listar todos os usuários (SUPER_ADMIN)")
+    @RequiresPermission("user.read")
+    @Operation(summary = "Listar todos os usuários")
     public ResponseEntity<Page<UserResponse>> getAllUsers(Pageable pageable) {
         Page<UserResponse> users = userService.getAllUsers(pageable);
         return ResponseEntity.ok(users);
     }
     
     @GetMapping("/search")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Buscar usuários (SUPER_ADMIN)")
+    @RequiresPermission("user.read")
+    @Operation(summary = "Buscar usuários")
     public ResponseEntity<Page<UserResponse>> searchUsers(
             @RequestParam String query,
             Pageable pageable) {
@@ -85,16 +85,16 @@ public class UserController {
     }
     
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Obter usuário por ID (SUPER_ADMIN)")
+    @RequiresPermission("user.read")
+    @Operation(summary = "Obter usuário por ID")
     public ResponseEntity<UserResponse> getUserById(@PathVariable UUID id) {
         UserResponse user = userService.getUserById(id);
         return ResponseEntity.ok(user);
     }
     
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Atualizar usuário (SUPER_ADMIN)")
+    @RequiresPermission("user.update")
+    @Operation(summary = "Atualizar usuário")
     public ResponseEntity<UserResponse> updateUser(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateUserRequest request) {
@@ -104,8 +104,8 @@ public class UserController {
     }
     
     @PostMapping("/{id}/roles")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Atribuir roles ao usuário (SUPER_ADMIN)")
+    @RequiresPermission("user.manage")
+    @Operation(summary = "Atribuir roles ao usuário")
     public ResponseEntity<UserResponse> assignRoles(
             @PathVariable UUID id,
             @RequestBody Set<UUID> roleIds) {
@@ -115,24 +115,24 @@ public class UserController {
     }
     
     @PostMapping("/{id}/deactivate")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Desativar usuário (SUPER_ADMIN)")
+    @RequiresPermission("user.manage")
+    @Operation(summary = "Desativar usuário")
     public ResponseEntity<Void> deactivateUser(@PathVariable UUID id) {
         userService.deactivateUser(id);
         return ResponseEntity.noContent().build();
     }
     
     @PostMapping("/{id}/activate")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Ativar usuário (SUPER_ADMIN)")
+    @RequiresPermission("user.manage")
+    @Operation(summary = "Ativar usuário")
     public ResponseEntity<Void> activateUser(@PathVariable UUID id) {
         userService.activateUser(id);
         return ResponseEntity.noContent().build();
     }
     
     @GetMapping("/role/{roleCode}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Listar usuários por role (SUPER_ADMIN)")
+    @RequiresPermission("user.read")
+    @Operation(summary = "Listar usuários por role")
     public ResponseEntity<Page<UserResponse>> getUsersByRole(
             @PathVariable String roleCode,
             Pageable pageable) {
