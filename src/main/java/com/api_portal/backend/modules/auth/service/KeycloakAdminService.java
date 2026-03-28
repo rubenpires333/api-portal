@@ -42,13 +42,31 @@ public class KeycloakAdminService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(adminToken);
             
+            // Extrair firstName e lastName
+            String firstName = request.getFirstName();
+            String lastName = request.getLastName();
+            
+            // Se não tiver firstName/lastName, tentar extrair do name
+            if ((firstName == null || firstName.isEmpty()) && request.getName() != null) {
+                String[] nameParts = request.getName().split(" ", 2);
+                firstName = nameParts[0];
+                lastName = nameParts.length > 1 ? nameParts[1] : "";
+            }
+            
+            // Se ainda não tiver firstName, usar parte do email
+            if (firstName == null || firstName.isEmpty()) {
+                firstName = request.getEmail().split("@")[0];
+            }
+            
+            // Obter role (padrão CONSUMER)
+            UserRole role = request.getRoleOrDefault();
+            log.info("Criando usuário {} com role: {}", request.getEmail(), role);
+            
             Map<String, Object> userRepresentation = new HashMap<>();
             userRepresentation.put("username", request.getEmail());
             userRepresentation.put("email", request.getEmail());
-            userRepresentation.put("firstName", request.getName().split(" ")[0]);
-            if (request.getName().split(" ").length > 1) {
-                userRepresentation.put("lastName", request.getName().substring(request.getName().indexOf(" ") + 1));
-            }
+            userRepresentation.put("firstName", firstName);
+            userRepresentation.put("lastName", lastName != null ? lastName : "");
             userRepresentation.put("enabled", true);
             userRepresentation.put("emailVerified", false);
             
@@ -75,12 +93,14 @@ public class KeycloakAdminService {
                     String userId = location.substring(location.lastIndexOf("/") + 1);
                     
                     // Atribuir role ao usuário
-                    assignRoleToUser(userId, request.getRole(), adminToken);
+                    log.info("Atribuindo role {} ao usuário {}", role, userId);
+                    assignRoleToUser(userId, role, adminToken);
                     
                     // Adicionar usuário ao grupo
-                    addUserToGroup(userId, request.getRole(), adminToken);
+                    log.info("Adicionando usuário {} ao grupo {}", userId, role);
+                    addUserToGroup(userId, role, adminToken);
                 }
-                log.info("Utilizador criado com sucesso: {}", request.getEmail());
+                log.info("Utilizador criado com sucesso: {} com role {}", request.getEmail(), role);
             } else {
                 throw new AuthException("Falha ao criar utilizador no Keycloak");
             }

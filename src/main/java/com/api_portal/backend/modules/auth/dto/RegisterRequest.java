@@ -4,7 +4,6 @@ import com.api_portal.backend.modules.auth.model.enums.UserRole;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -12,9 +11,13 @@ import lombok.Data;
 @Schema(description = "Request para registro de novo utilizador")
 public class RegisterRequest {
     
-    @NotBlank(message = "Nome é obrigatório")
-    @Size(min = 3, max = 100, message = "Nome deve ter entre 3 e 100 caracteres")
-    @Schema(description = "Nome completo do utilizador", example = "João Silva")
+    @Schema(description = "Primeiro nome do utilizador", example = "João")
+    private String firstName;
+    
+    @Schema(description = "Sobrenome do utilizador", example = "Silva")
+    private String lastName;
+    
+    @Schema(description = "Nome completo do utilizador (alternativa a firstName/lastName)", example = "João Silva")
     private String name;
     
     @NotBlank(message = "Email é obrigatório")
@@ -23,11 +26,39 @@ public class RegisterRequest {
     private String email;
     
     @NotBlank(message = "Password é obrigatória")
-    @Size(min = 8, message = "Password deve ter no mínimo 8 caracteres")
+    @Size(min = 6, message = "Password deve ter no mínimo 6 caracteres")
     @Schema(description = "Password do utilizador", example = "Password@123")
     private String password;
     
-    @NotNull(message = "Role é obrigatória")
-    @Schema(description = "Papel do utilizador", example = "CONSUMER")
+    @Schema(description = "Papel do utilizador (padrão: CONSUMER)", example = "CONSUMER")
     private UserRole role;
+    
+    /**
+     * Retorna o nome completo, seja de firstName/lastName ou name
+     */
+    public String getFullName() {
+        if (name != null && !name.isEmpty()) {
+            return name;
+        }
+        
+        StringBuilder fullName = new StringBuilder();
+        if (firstName != null && !firstName.isEmpty()) {
+            fullName.append(firstName);
+        }
+        if (lastName != null && !lastName.isEmpty()) {
+            if (fullName.length() > 0) {
+                fullName.append(" ");
+            }
+            fullName.append(lastName);
+        }
+        
+        return fullName.length() > 0 ? fullName.toString() : email;
+    }
+    
+    /**
+     * Retorna o role, padrão CONSUMER se não especificado
+     */
+    public UserRole getRoleOrDefault() {
+        return role != null ? role : UserRole.CONSUMER;
+    }
 }
