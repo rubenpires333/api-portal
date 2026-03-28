@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -29,12 +30,20 @@ public class AuditController {
     
     @GetMapping
     @Operation(
-        summary = "Listar todos os logs de auditoria",
+        summary = "Listar todos os logs de auditoria com filtros",
         security = @SecurityRequirement(name = "Bearer Authentication")
     )
     public ResponseEntity<Page<AuditLog>> getAllLogs(
-            @PageableDefault(size = 50, sort = "timestamp", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(auditService.getAllLogs(pageable));
+            @RequestParam(required = false) String userEmail,
+            @RequestParam(required = false) String endpoint,
+            @RequestParam(required = false) String method,
+            @RequestParam(required = false) Integer statusCode,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end,
+            @PageableDefault(size = 20, sort = "timestamp", direction = Sort.Direction.DESC) Pageable pageable) {
+        
+        Page<AuditLog> logs = auditService.searchLogs(userEmail, endpoint, method, statusCode, start, end, pageable);
+        return ResponseEntity.ok(logs);
     }
     
     @GetMapping("/{id}")
@@ -79,5 +88,23 @@ public class AuditController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end,
             @PageableDefault(size = 50, sort = "timestamp", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(auditService.getLogsByPeriod(start, end, pageable));
+    }
+    
+    @GetMapping("/unique-users")
+    @Operation(
+        summary = "Listar utilizadores únicos nos logs",
+        security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    public ResponseEntity<List<String>> getUniqueUsers() {
+        return ResponseEntity.ok(auditService.getUniqueUsers());
+    }
+    
+    @GetMapping("/unique-endpoints")
+    @Operation(
+        summary = "Listar endpoints únicos nos logs",
+        security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    public ResponseEntity<List<String>> getUniqueEndpoints() {
+        return ResponseEntity.ok(auditService.getUniqueEndpoints());
     }
 }

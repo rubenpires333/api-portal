@@ -4,6 +4,7 @@ import com.api_portal.backend.modules.audit.domain.AuditLog;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -13,7 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
+public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSpecificationExecutor<AuditLog> {
     
     Page<AuditLog> findByUserId(String userId, Pageable pageable);
     
@@ -40,4 +41,10 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
     
     @Query("SELECT a.endpoint, COUNT(a) as count FROM AuditLog a GROUP BY a.endpoint ORDER BY count DESC")
     List<Object[]> findMostAccessedEndpoints(Pageable pageable);
+    
+    @Query("SELECT DISTINCT a.userEmail FROM AuditLog a WHERE a.userEmail IS NOT NULL ORDER BY a.userEmail")
+    List<String> findDistinctUserEmails();
+    
+    @Query("SELECT DISTINCT a.endpoint FROM AuditLog a ORDER BY a.endpoint")
+    List<String> findDistinctEndpoints();
 }

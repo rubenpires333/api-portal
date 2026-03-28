@@ -6,11 +6,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.criteria.Predicate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -68,6 +72,49 @@ public class AuditService {
     }
     
     @Transactional(readOnly = true)
+    public Page<AuditLog> searchLogs(
+            String userEmail,
+            String endpoint,
+            String method,
+            Integer statusCode,
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            Pageable pageable) {
+        
+        Specification<AuditLog> spec = (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            
+            if (userEmail != null && !userEmail.isEmpty()) {
+                predicates.add(criteriaBuilder.equal(root.get("userEmail"), userEmail));
+            }
+            
+            if (endpoint != null && !endpoint.isEmpty()) {
+                predicates.add(criteriaBuilder.equal(root.get("endpoint"), endpoint));
+            }
+            
+            if (method != null && !method.isEmpty()) {
+                predicates.add(criteriaBuilder.equal(root.get("method"), method));
+            }
+            
+            if (statusCode != null) {
+                predicates.add(criteriaBuilder.equal(root.get("statusCode"), statusCode));
+            }
+            
+            if (startDate != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("timestamp"), startDate));
+            }
+            
+            if (endDate != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("timestamp"), endDate));
+            }
+            
+            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
+        
+        return auditLogRepository.findAll(spec, pageable);
+    }
+    
+    @Transactional(readOnly = true)
     public Page<AuditLog> getLogsByUserId(String userId, Pageable pageable) {
         return auditLogRepository.findByUserId(userId, pageable);
     }
@@ -85,6 +132,16 @@ public class AuditService {
     @Transactional(readOnly = true)
     public AuditLog getLogById(UUID id) {
         return auditLogRepository.findById(id).orElse(null);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<String> getUniqueUsers() {
+        return auditLogRepository.findDistinctUserEmails();
+    }
+    
+    @Transactional(readOnly = true)
+    public List<String> getUniqueEndpoints() {
+        return auditLogRepository.findDistinctEndpoints();
     }
     
     private String truncate(String str, int maxLength) {
