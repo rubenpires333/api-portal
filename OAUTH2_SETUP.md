@@ -158,7 +158,7 @@ grant_type=authorization_code
 &client_id=portal-api
 &client_secret=RNEWX0EvC41j5ytpCg9Qw6EuhcEJdixn
 &code=CODIGO_RECEBIDO
-&redirect_uri=http://localhost:3000/auth/callback
+&redirect_uri=http://localhost:4200/auth/callback
 ```
 
 5. Keycloak retorna o access_token e refresh_token
