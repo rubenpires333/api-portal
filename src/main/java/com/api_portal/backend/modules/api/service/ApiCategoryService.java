@@ -7,9 +7,6 @@ import com.api_portal.backend.modules.api.exception.ApiException;
 import com.api_portal.backend.modules.api.repository.ApiCategoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.CachePut;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +22,6 @@ public class ApiCategoryService {
     private final ApiCategoryRepository categoryRepository;
     
     @Transactional
-    @CacheEvict(value = "categories", allEntries = true)
     public ApiCategoryResponse createCategory(ApiCategoryRequest request) {
         log.info("Criando categoria: {}", request.getName());
         
@@ -49,7 +45,6 @@ public class ApiCategoryService {
     }
     
     @Transactional(readOnly = true)
-    @Cacheable(value = "categories", key = "'all'")
     public List<ApiCategoryResponse> getAllCategories() {
         return categoryRepository.findAllByOrderByDisplayOrderAsc()
             .stream()
@@ -58,7 +53,6 @@ public class ApiCategoryService {
     }
     
     @Transactional(readOnly = true)
-    @Cacheable(value = "categories", key = "#id")
     public ApiCategoryResponse getCategoryById(UUID id) {
         ApiCategory category = categoryRepository.findById(id)
             .orElseThrow(() -> new ApiException("Categoria não encontrada"));
@@ -67,8 +61,6 @@ public class ApiCategoryService {
     }
     
     @Transactional
-    @CachePut(value = "categories", key = "#id")
-    @CacheEvict(value = "categories", key = "'all'")
     public ApiCategoryResponse updateCategory(UUID id, ApiCategoryRequest request) {
         log.info("Atualizando categoria: {}", id);
         
@@ -92,7 +84,6 @@ public class ApiCategoryService {
     }
     
     @Transactional
-    @CacheEvict(value = "categories", allEntries = true)
     public void deleteCategory(UUID id) {
         log.info("Deletando categoria: {}", id);
         
