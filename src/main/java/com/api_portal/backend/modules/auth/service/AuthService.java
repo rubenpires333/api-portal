@@ -2,7 +2,7 @@ package com.api_portal.backend.modules.auth.service;
 
 import com.api_portal.backend.modules.auth.dto.*;
 import com.api_portal.backend.modules.auth.exception.AuthException;
-import com.api_portal.backend.modules.auth.model.enums.UserRole;
+import com.api_portal.backend.modules.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,6 +10,7 @@ import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -24,6 +25,8 @@ public class AuthService {
     
     private final RestTemplate restTemplate;
     private final KeycloakAdminService keycloakAdminService;
+    private final JwtDecoder jwtDecoder;
+    private final UserService userService;
     
     @Value("${keycloak.url}")
     private String keycloakUrl;
@@ -37,7 +40,7 @@ public class AuthService {
     @Value("${keycloak.client-secret:change-me-in-production}")
     private String clientSecret;
     
-    public TokenResponse login(LoginRequest request) {
+    public TokenResponse login(LoginRequest request, String ipAddress) {
         try {
             String tokenUrl = String.format("%s/realms/%s/protocol/openid-connect/token", 
                 keycloakUrl, realm);
@@ -63,9 +66,18 @@ public class AuthService {
             
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                 Map<String, Object> responseBody = response.getBody();
+                String accessToken = (String) responseBody.get("access_token");
+                
+                // Decodificar o token e sincronizar usuário
+                try {
+                    Jwt jwt = jwtDecoder.decode(accessToken);
+                    syncUserFromJwt(jwt, ipAddress);
+                } catch (Exception e) {
+                    log.warn("Erro ao sincronizar usuário após login: {}", e.getMessage());
+                }
                 
                 return TokenResponse.builder()
-                    .accessToken((String) responseBody.get("access_token"))
+                    .accessToken(accessToken)
                     .refreshToken((String) responseBody.get("refresh_token"))
                     .tokenType("Bearer")
                     .expiresIn(((Number) responseBody.get("expires_in")).longValue())
@@ -122,7 +134,7 @@ public class AuthService {
         }
     }
     
-    public TokenResponse register(RegisterRequest request) {
+    public TokenResponse register(RegisterRequest request, String ipAddress) {
         try {
             // Criar usuário no Keycloak
             keycloakAdminService.createUser(request);
@@ -132,7 +144,7 @@ public class AuthService {
             loginRequest.setEmail(request.getEmail());
             loginRequest.setPassword(request.getPassword());
             
-            return login(loginRequest);
+            return login(loginRequest, ipAddress);
             
         } catch (Exception e) {
             log.error("Erro ao registrar utilizador: {}", e.getMessage());
@@ -163,20 +175,6 @@ public class AuthService {
             throw new AuthException("Erro ao obter dados do utilizador", e);
         }
     } 
-    
-    @SuppressWarnings("unchecked")
-    private List<String> extractRoles(Jwt jwt) {
-        try {
-            Map<String, Object> realmAccess = jwt.getClaim("realm_access");
-            if (realmAccess != null && realmAccess.containsKey("roles")) {
-                return (List<String>) realmAccess.get("roles");
-            }
-            return Collections.emptyList();
-        } catch (Exception e) {
-            log.warn("Erro ao extrair roles do JWT: {}", e.getMessage());
-            return Collections.emptyList();
-        }
-    }
     
     public void updatePassword(String currentPassword, String newPassword, String confirmPassword) {
         try {
@@ -237,6 +235,87 @@ public class AuthService {
         } catch (Exception e) {
             log.error("Erro ao atualizar informações: {}", e.getMessage());
             throw new AuthException("Erro ao atualizar informações do utilizador", e);
+        }
+    }
+    
+    /**
+     * Sincroniza usuário do JWT para a base de dados
+     */
+    private void syncUserFromJwt(Jwt jwt, String ipAddress) {
+        try {
+            String keycloakId = jwt.getSubject();
+            String email = jwt.getClaimAsString("email");
+            String firstName = jwt.getClaimAsString("given_name");
+            String lastName = jwt.getClaimAsString("family_name");
+            String username = jwt.getClaimAsString("preferred_username");
+            Boolean emailVerified = jwt.getClaimAsBoolean("email_verified");
+            
+            // Extrair roles do JWT
+            List<String> roleCodes = extractRoles(jwt);
+            
+            // Se não tiver nome, usar o nome do email
+            if (firstName == null || firstName.isEmpty()) {
+                firstName = email != null ? email.split("@")[0] : "User";
+            }
+            if (lastName == null || lastName.isEmpty()) {
+                lastName = "";
+            }
+            
+            log.info("Sincronizando usuário após autenticação: {} ({})", email, keycloakId);
+            log.info("Roles extraídas do JWT: {}", roleCodes);
+            
+            var user = userService.createOrUpdateUser(
+                keycloakId, 
+                email, 
+                firstName, 
+                lastName, 
+                username, 
+                emailVerified,
+                roleCodes
+            );
+            
+            // Atualizar último login
+            if (ipAddress != null && user.getId() != null) {
+                userService.updateLastLogin(user.getId(), ipAddress);
+            }
+            
+        } catch (Exception e) {
+            log.error("Erro ao sincronizar usuário do JWT: {}", e.getMessage(), e);
+        }
+    }
+    
+    @SuppressWarnings("unchecked")
+    private List<String> extractRoles(Jwt jwt) {
+        try {
+            // Tentar extrair de realm_access.roles
+            Map<String, Object> realmAccess = jwt.getClaim("realm_access");
+            if (realmAccess != null && realmAccess.containsKey("roles")) {
+                List<String> roles = (List<String>) realmAccess.get("roles");
+                log.debug("Roles encontradas em realm_access: {}", roles);
+                return roles;
+            }
+            
+            // Tentar extrair de resource_access
+            Map<String, Object> resourceAccess = jwt.getClaim("resource_access");
+            if (resourceAccess != null) {
+                for (Map.Entry<String, Object> entry : resourceAccess.entrySet()) {
+                    if (entry.getValue() instanceof Map) {
+                        Map<String, Object> resource = (Map<String, Object>) entry.getValue();
+                        if (resource.containsKey("roles")) {
+                            List<String> roles = (List<String>) resource.get("roles");
+                            log.debug("Roles encontradas em resource_access.{}: {}", entry.getKey(), roles);
+                            return roles;
+                        }
+                    }
+                }
+            }
+            
+            log.warn("Nenhuma role encontrada no JWT");
+            return new ArrayList<>();
+            
+        } catch (Exception e) {
+            log.error("Erro ao extrair roles do JWT: {}", e.getMessage());
+            return new ArrayList<>();
         }
     }
 }

@@ -7,6 +7,7 @@ networks:
 volumes:
   db_data:
   keycloak_data:
+  redis_data:
 
 services:
 
@@ -85,3 +86,23 @@ services:
       timeout: 10s
       retries: 10
       start_period: 60s
+
+  # ─────────────────────────────────────────
+  #  Redis (Cache)
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: apiportal-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - api-portal-net
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5

@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -31,8 +32,11 @@ public class AuthController {
         @ApiResponse(responseCode = "401", description = "Credenciais inválidas"),
         @ApiResponse(responseCode = "400", description = "Dados inválidos")
     })
-    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
-        TokenResponse response = authService.login(request);
+    public ResponseEntity<TokenResponse> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest) {
+        String ipAddress = httpRequest.getRemoteAddr();
+        TokenResponse response = authService.login(request, ipAddress);
         return ResponseEntity.ok(response);
     }
     
@@ -61,8 +65,11 @@ public class AuthController {
         @ApiResponse(responseCode = "400", description = "Dados inválidos ou email já existe"),
         @ApiResponse(responseCode = "500", description = "Erro ao criar utilizador")
     })
-    public ResponseEntity<TokenResponse> register(@Valid @RequestBody RegisterRequest request) {
-        TokenResponse response = authService.register(request);
+    public ResponseEntity<TokenResponse> register(
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletRequest httpRequest) {
+        String ipAddress = httpRequest.getRemoteAddr();
+        TokenResponse response = authService.register(request, ipAddress);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
     

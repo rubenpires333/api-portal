@@ -1,9 +1,11 @@
 package com.api_portal.backend.modules.auth.model;
 
+import com.api_portal.backend.shared.domain.Auditable;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
@@ -11,10 +13,11 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "api_keys")
 @Data
+@EqualsAndHashCode(callSuper = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ApiKey {
+public class ApiKey extends Auditable {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,17 +39,9 @@ public class ApiKey {
     @Builder.Default
     private Boolean active = true;
     
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-    
     @Column
     private LocalDateTime expiresAt;
     
     @Column
     private LocalDateTime lastUsedAt;
-    
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-    }
 }
