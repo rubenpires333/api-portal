@@ -55,6 +55,40 @@ public class PermissionManagementService {
     }
     
     @Transactional(readOnly = true)
+    public PermissionResponse getPermissionById(UUID id) {
+        log.info("Buscando permissão por ID: {}", id);
+        
+        Permission permission = permissionRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Permissão não encontrada"));
+        
+        return mapToResponse(permission);
+    }
+    
+    @Transactional
+    @CacheEvict(value = "permissions", allEntries = true)
+    public PermissionResponse updatePermission(UUID id, PermissionRequest request) {
+        log.info("Atualizando permissão: {}", id);
+        
+        Permission permission = permissionRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Permissão não encontrada"));
+        
+        if (!permission.getCode().equals(request.getCode()) && 
+            permissionRepository.existsByCode(request.getCode())) {
+            throw new RuntimeException("Permissão com este código já existe");
+        }
+        
+        permission.setName(request.getName());
+        permission.setCode(request.getCode());
+        permission.setDescription(request.getDescription());
+        permission.setResource(request.getResource());
+        permission.setAction(request.getAction());
+        
+        permission = permissionRepository.save(permission);
+        
+        return mapToResponse(permission);
+    }
+    
+    @Transactional(readOnly = true)
     public List<PermissionResponse> getPermissionsByResource(String resource) {
         return permissionRepository.findByResource(resource)
             .stream()

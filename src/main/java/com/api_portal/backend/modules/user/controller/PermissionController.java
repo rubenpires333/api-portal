@@ -41,6 +41,23 @@ public class PermissionController {
         return ResponseEntity.ok(permissions);
     }
     
+    @GetMapping("/{id}")
+    @Operation(summary = "Buscar permissão por ID")
+    public ResponseEntity<PermissionResponse> getPermissionById(@PathVariable UUID id) {
+        PermissionResponse permission = permissionManagementService.getPermissionById(id);
+        return ResponseEntity.ok(permission);
+    }
+    
+    @PutMapping("/{id}")
+    @RequiresPermission("permission.manage")
+    @Operation(summary = "Atualizar permissão")
+    public ResponseEntity<PermissionResponse> updatePermission(
+            @PathVariable UUID id,
+            @Valid @RequestBody PermissionRequest request) {
+        PermissionResponse permission = permissionManagementService.updatePermission(id, request);
+        return ResponseEntity.ok(permission);
+    }
+    
     @GetMapping("/resource/{resource}")
     @Operation(summary = "Listar permissões por recurso")
     public ResponseEntity<List<PermissionResponse>> getPermissionsByResource(@PathVariable String resource) {
