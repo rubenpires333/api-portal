@@ -1,0 +1,267 @@
+package com.api_portal.backend.modules.subscription.service;
+
+import com.api_portal.backend.modules.api.domain.Api;
+import com.api_portal.backend.modules.api.domain.enums.ApiStatus;
+import com.api_portal.backend.modules.api.repository.ApiRepository;
+import com.api_portal.backend.modules.subscription.domain.entity.Subscription;
+import com.api_portal.backend.modules.subscription.domain.enums.SubscriptionStatus;
+import com.api_portal.backend.modules.subscription.domain.repository.SubscriptionRepository;
+import com.api_portal.backend.modules.subscription.dto.RevokeRequest;
+import com.api_portal.backend.modules.subscription.dto.SubscriptionRequest;
+import com.api_portal.backend.modules.subscription.dto.SubscriptionResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class SubscriptionService {
+    
+    private final SubscriptionRepository subscriptionRepository;
+    private final ApiRepository apiRepository;
+    
+    /**
+     * Consumer subscreve uma API
+     */
+    @Transactional
+    public SubscriptionResponse subscribe(SubscriptionRequest request, Authentication authentication) {
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String consumerId = jwt.getSubject();
+        String consumerEmail = jwt.getClaimAsString("email");
+        String consumerName = jwt.getClaimAsString("name");
+        
+        // Verificar se API existe e está publicada
+        Api api = apiRepository.findById(request.getApiId())
+            .orElseThrow(() -> new IllegalArgumentException("API não encontrada"));
+        
+        if (api.getStatus() != ApiStatus.PUBLISHED) {
+            throw new IllegalStateException("Apenas APIs publicadas podem ser subscritas");
+        }
+        
+        // Verificar se já existe subscrição ativa
+        if (subscriptionRepository.existsByConsumerIdAndApiIdAndStatus(
+                consumerId, request.getApiId(), SubscriptionStatus.ACTIVE)) {
+            throw new IllegalStateException("Já existe uma subscrição ativa para esta API");
+        }
+        
+        // Criar subscrição (aprovação automática por enquanto)
+        Subscription subscription = Subscription.builder()
+            .api(api)
+            .consumerId(consumerId)
+            .consumerEmail(consumerEmail)
+            .consumerName(consumerName)
+            .status(SubscriptionStatus.ACTIVE)
+            .apiKey(generateApiKey())
+            .approvedAt(LocalDateTime.now())
+            .notes(request.getNotes())
+            .build();
+        
+        subscription = subscriptionRepository.save(subscription);
+        
+        log.info("Nova subscrição criada: {} para API: {}", subscription.getId(), api.getName());
+        
+        return mapToResponse(subscription);
+    }
+    
+    /**
+     * Listar subscrições do consumer
+     */
+    @Transactional(readOnly = true)
+    public Page<SubscriptionResponse> getMySubscriptions(Authentication authentication, Pageable pageable) {
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String consumerId = jwt.getSubject();
+        
+        return subscriptionRepository.findByConsumerId(consumerId, pageable)
+            .map(this::mapToResponse);
+    }
+    
+    /**
+     * Detalhes de uma subscrição (consumer)
+     */
+    @Transactional(readOnly = true)
+    public SubscriptionResponse getSubscriptionById(UUID id, Authentication authentication) {
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String consumerId = jwt.getSubject();
+        
+        Subscription subscription = subscriptionRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Subscrição não encontrada"));
+        
+        if (!subscription.getConsumerId().equals(consumerId)) {
+            throw new IllegalStateException("Acesso negado");
+        }
+        
+        return mapToResponse(subscription);
+    }
+    
+    /**
+     * Cancelar subscrição (consumer)
+     */
+    @Transactional
+    @CacheEvict(value = "apiKeys", key = "#result.apiKey")
+    public SubscriptionResponse cancelSubscription(UUID id, Authentication authentication) {
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String consumerId = jwt.getSubject();
+        
+        Subscription subscription = subscriptionRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Subscrição não encontrada"));
+        
+        if (!subscription.getConsumerId().equals(consumerId)) {
+            throw new IllegalStateException("Acesso negado");
+        }
+        
+        if (subscription.getStatus() == SubscriptionStatus.CANCELLED) {
+            throw new IllegalStateException("Subscrição já está cancelada");
+        }
+        
+        subscription.setStatus(SubscriptionStatus.CANCELLED);
+        subscription = subscriptionRepository.save(subscription);
+        
+        log.info("Subscrição cancelada: {}", id);
+        
+        return mapToResponse(subscription);
+    }
+    
+    /**
+     * Listar subscrições das APIs do provider
+     */
+    @Transactional(readOnly = true)
+    public Page<SubscriptionResponse> getProviderSubscriptions(
+            Authentication authentication, 
+            SubscriptionStatus status,
+            Pageable pageable) {
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String providerId = jwt.getSubject();
+        
+        Page<Subscription> subscriptions;
+        if (status != null) {
+            subscriptions = subscriptionRepository.findByProviderIdAndStatus(providerId, status, pageable);
+        } else {
+            subscriptions = subscriptionRepository.findByProviderId(providerId, pageable);
+        }
+        
+        return subscriptions.map(this::mapToResponse);
+    }
+    
+    /**
+     * Aprovar subscrição (provider)
+     */
+    @Transactional
+    public SubscriptionResponse approveSubscription(UUID id, Authentication authentication) {
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String providerId = jwt.getSubject();
+        
+        Subscription subscription = subscriptionRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Subscrição não encontrada"));
+        
+        if (!subscription.getApi().getProviderId().equals(providerId)) {
+            throw new IllegalStateException("Acesso negado");
+        }
+        
+        if (subscription.getStatus() != SubscriptionStatus.PENDING) {
+            throw new IllegalStateException("Apenas subscrições pendentes podem ser aprovadas");
+        }
+        
+        subscription.setStatus(SubscriptionStatus.ACTIVE);
+        subscription.setApprovedAt(LocalDateTime.now());
+        subscription = subscriptionRepository.save(subscription);
+        
+        log.info("Subscrição aprovada: {}", id);
+        
+        return mapToResponse(subscription);
+    }
+    
+    /**
+     * Revogar subscrição (provider)
+     */
+    @Transactional
+    @CacheEvict(value = "apiKeys", key = "#result.apiKey")
+    public SubscriptionResponse revokeSubscription(
+            UUID id, 
+            RevokeRequest request,
+            Authentication authentication) {
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String providerId = jwt.getSubject();
+        
+        Subscription subscription = subscriptionRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Subscrição não encontrada"));
+        
+        if (!subscription.getApi().getProviderId().equals(providerId)) {
+            throw new IllegalStateException("Acesso negado");
+        }
+        
+        if (subscription.getStatus() == SubscriptionStatus.REVOKED) {
+            throw new IllegalStateException("Subscrição já está revogada");
+        }
+        
+        subscription.setStatus(SubscriptionStatus.REVOKED);
+        subscription.setRevokedAt(LocalDateTime.now());
+        subscription.setRevokeReason(request.getReason());
+        subscription = subscriptionRepository.save(subscription);
+        
+        log.info("Subscrição revogada: {} - Motivo: {}", id, request.getReason());
+        
+        return mapToResponse(subscription);
+    }
+    
+    /**
+     * Validar API Key (usado pelo gateway)
+     */
+    @Cacheable(value = "apiKeys", key = "#apiKey")
+    public Subscription validateApiKey(String apiKey) {
+        return subscriptionRepository.findActiveByApiKey(apiKey)
+            .orElseThrow(() -> new IllegalArgumentException("API Key inválida ou inativa"));
+    }
+    
+    /**
+     * Gerar API Key única
+     */
+    private String generateApiKey() {
+        return "apk_" + UUID.randomUUID().toString().replace("-", "");
+    }
+    
+    /**
+     * Mapear entidade para DTO
+     */
+    private SubscriptionResponse mapToResponse(Subscription subscription) {
+        // Buscar versão default ou usar "latest"
+        String apiVersion = "latest";
+        if (subscription.getApi().getVersions() != null && !subscription.getApi().getVersions().isEmpty()) {
+            apiVersion = subscription.getApi().getVersions().stream()
+                .filter(v -> v.getIsDefault() != null && v.getIsDefault())
+                .findFirst()
+                .map(v -> v.getVersion())
+                .orElse("latest");
+        }
+        
+        return SubscriptionResponse.builder()
+            .id(subscription.getId())
+            .apiId(subscription.getApi().getId())
+            .apiName(subscription.getApi().getName())
+            .apiSlug(subscription.getApi().getSlug())
+            .apiVersion(apiVersion)
+            .consumerId(subscription.getConsumerId())
+            .consumerEmail(subscription.getConsumerEmail())
+            .consumerName(subscription.getConsumerName())
+            .status(subscription.getStatus())
+            .apiKey(subscription.getApiKey())
+            .expiresAt(subscription.getExpiresAt())
+            .approvedAt(subscription.getApprovedAt())
+            .revokedAt(subscription.getRevokedAt())
+            .revokeReason(subscription.getRevokeReason())
+            .notes(subscription.getNotes())
+            .createdAt(subscription.getCreatedAt())
+            .updatedAt(subscription.getUpdatedAt())
+            .build();
+    }
+}

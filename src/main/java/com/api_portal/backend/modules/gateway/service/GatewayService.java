@@ -3,6 +3,8 @@ package com.api_portal.backend.modules.gateway.service;
 import com.api_portal.backend.modules.api.domain.Api;
 import com.api_portal.backend.modules.api.exception.ApiException;
 import com.api_portal.backend.modules.api.repository.ApiRepository;
+import com.api_portal.backend.modules.subscription.domain.entity.Subscription;
+import com.api_portal.backend.modules.subscription.service.SubscriptionService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,7 @@ public class GatewayService {
     
     private final ApiRepository apiRepository;
     private final RestTemplate restTemplate;
+    private final SubscriptionService subscriptionService;
     
     public ResponseEntity<?> proxyRequest(String slug, HttpServletRequest request, String body) {
         log.info("=== GATEWAY REQUEST ===");
@@ -28,19 +31,56 @@ public class GatewayService {
         log.info("URI: {}", request.getRequestURI());
         log.info("Query: {}", request.getQueryString());
         
-        // 1. Buscar API pelo slug
+        // 1. Validar API Key
+        String apiKey = request.getHeader("X-API-Key");
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            log.error("API Key não fornecida");
+            return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"error\":\"Unauthorized\",\"message\":\"API Key é obrigatória. Adicione o header X-API-Key.\"}");
+        }
+        
+        // 2. Validar subscrição
+        Subscription subscription;
+        try {
+            subscription = subscriptionService.validateApiKey(apiKey);
+            log.info("API Key válida para consumer: {}", subscription.getConsumerEmail());
+            
+            // Adicionar informações da subscrição ao request para audit log
+            request.setAttribute("subscriptionId", subscription.getId().toString());
+            request.setAttribute("consumerId", subscription.getConsumerId());
+            request.setAttribute("consumerEmail", subscription.getConsumerEmail());
+        } catch (Exception e) {
+            log.error("API Key inválida: {}", apiKey);
+            return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"error\":\"Unauthorized\",\"message\":\"API Key inválida ou inativa.\"}");
+        }
+        
+        // 3. Buscar API pelo slug
         Api api = apiRepository.findBySlug(slug)
             .orElseThrow(() -> new ApiException("API não encontrada: " + slug));
         
         log.info("API encontrada: {} ({})", api.getName(), api.getBaseUrl());
         
-        // 2. Verificar se API está ativa (permite testar antes de publicar)
+        // 4. Verificar se a subscrição é para esta API
+        if (!subscription.getApi().getId().equals(api.getId())) {
+            log.error("API Key não autorizada para esta API");
+            return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"error\":\"Forbidden\",\"message\":\"API Key não autorizada para esta API.\"}");
+        }
+        
+        // 5. Verificar se API está ativa
         if (!api.getIsActive()) {
             log.error("API inativa: {}", slug);
             throw new ApiException("API está inativa");
         }
         
-        // 3. Construir URL de destino
+        // 6. Construir URL de destino
         String path = extractPath(request.getRequestURI(), slug);
         String targetUrl = api.getBaseUrl() + path;
         
@@ -50,7 +90,7 @@ public class GatewayService {
         
         log.info("Target URL: {}", targetUrl);
         
-        // 4. Copiar headers
+        // 7. Copiar headers
         HttpHeaders headers = new HttpHeaders();
         Enumeration<String> headerNames = request.getHeaderNames();
         while (headerNames.hasMoreElements()) {
@@ -68,7 +108,7 @@ public class GatewayService {
         
         log.info("Headers copiados: {}", headers.keySet());
         
-        // 5. Fazer requisição
+        // 8. Fazer requisição
         try {
             HttpEntity<String> entity = new HttpEntity<>(body, headers);
             HttpMethod method = HttpMethod.valueOf(request.getMethod());
