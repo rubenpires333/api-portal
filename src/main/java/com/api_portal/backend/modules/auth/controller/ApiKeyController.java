@@ -76,6 +76,27 @@ public class ApiKeyController {
         return ResponseEntity.ok(apiKeys);
     }
     
+    @GetMapping("/{id}")
+    @Operation(
+        summary = "Obter API Key por ID",
+        description = "Obtém detalhes completos de uma API Key (incluindo valor)"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "API Key obtida com sucesso"),
+        @ApiResponse(responseCode = "401", description = "Não autenticado"),
+        @ApiResponse(responseCode = "404", description = "API Key não encontrada")
+    })
+    public ResponseEntity<ApiKeyResponse> getApiKeyById(
+            @PathVariable Long id,
+            Authentication authentication) {
+        String userId = getUserId(authentication);
+        
+        ApiKey apiKey = apiKeyService.getApiKeyById(id, userId);
+        ApiKeyResponse response = mapToResponse(apiKey);
+        
+        return ResponseEntity.ok(response);
+    }
+    
     @DeleteMapping("/{id}")
     @Operation(
         summary = "Revogar API Key",

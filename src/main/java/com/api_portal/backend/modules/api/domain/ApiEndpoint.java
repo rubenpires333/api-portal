@@ -51,6 +51,12 @@ public class ApiEndpoint extends Auditable {
     @Builder.Default
     private Boolean requiresAuth = true;
     
+    @Column(columnDefinition = "TEXT")
+    private String authHeadersJson;
+    
+    @Column(columnDefinition = "TEXT")
+    private String authQueryParamsJson;
+    
     @Column(nullable = false)
     @Builder.Default
     private Boolean isDeprecated = false;

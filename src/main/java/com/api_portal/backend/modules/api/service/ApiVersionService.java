@@ -106,6 +106,34 @@ public class ApiVersionService {
     }
     
     @Transactional
+    public ApiVersionResponse publishVersion(UUID apiId, UUID versionId, String providerId) {
+        Api api = apiRepository.findById(apiId)
+            .orElseThrow(() -> new ApiException("API não encontrada"));
+        
+        if (!api.getProviderId().equals(providerId)) {
+            throw new ApiException("Você não tem permissão");
+        }
+        
+        ApiVersion version = versionRepository.findById(versionId)
+            .orElseThrow(() -> new ApiException("Versão não encontrada"));
+        
+        if (!version.getApi().getId().equals(apiId)) {
+            throw new ApiException("Versão não pertence a esta API");
+        }
+        
+        if (version.getStatus() != ApiStatus.DRAFT) {
+            throw new ApiException("Apenas versões em rascunho podem ser publicadas");
+        }
+        
+        version.setStatus(ApiStatus.PUBLISHED);
+        version = versionRepository.save(version);
+        
+        log.info("Versão {} publicada com sucesso", version.getVersion());
+        
+        return mapToResponse(version);
+    }
+    
+    @Transactional
     public ApiVersionResponse deprecateVersion(UUID id, String message, String providerId) {
         ApiVersion version = versionRepository.findById(id)
             .orElseThrow(() -> new ApiException("Versão não encontrada"));

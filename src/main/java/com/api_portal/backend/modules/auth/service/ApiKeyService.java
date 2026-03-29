@@ -83,6 +83,17 @@ public class ApiKeyService {
         return apiKeyRepository.findByUserIdAndActiveTrue(userId);
     }
     
+    public ApiKey getApiKeyById(Long apiKeyId, String userId) {
+        ApiKey apiKey = apiKeyRepository.findById(apiKeyId)
+            .orElseThrow(() -> new AuthException("API Key não encontrada"));
+        
+        if (!apiKey.getUserId().equals(userId)) {
+            throw new AuthException("Não autorizado a acessar esta API Key");
+        }
+        
+        return apiKey;
+    }
+    
     @Transactional
     public void revokeApiKey(Long apiKeyId, String userId) {
         ApiKey apiKey = apiKeyRepository.findById(apiKeyId)
@@ -112,7 +123,7 @@ public class ApiKeyService {
     }
     
     private String generateApiKey() {
-        byte[] randomBytes = new byte[32];
+        byte[] randomBytes = new byte[48]; // 48 bytes = 384 bits = ~64 caracteres
         secureRandom.nextBytes(randomBytes);
         String key = base64Encoder.encodeToString(randomBytes);
         

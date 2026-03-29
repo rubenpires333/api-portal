@@ -10,9 +10,6 @@ import com.api_portal.backend.modules.api.repository.ApiCategoryRepository;
 import com.api_portal.backend.modules.api.repository.ApiRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.CachePut;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -86,7 +83,6 @@ public class ApiService {
     }
     
     @Transactional(readOnly = true)
-    @Cacheable(value = "apis", key = "#id")
     public ApiResponse getApiById(UUID id) {
         Api api = apiRepository.findById(id)
             .orElseThrow(() -> new ApiException("API não encontrada"));
@@ -95,7 +91,6 @@ public class ApiService {
     }
     
     @Transactional(readOnly = true)
-    @Cacheable(value = "apis", key = "'slug:' + #slug")
     public ApiResponse getApiBySlug(String slug) {
         Api api = apiRepository.findBySlug(slug)
             .orElseThrow(() -> new ApiException("API não encontrada"));
@@ -112,8 +107,6 @@ public class ApiService {
     }
     
     @Transactional
-    @CachePut(value = "apis", key = "#id")
-    @CacheEvict(value = {"apis", "apiVersions"}, allEntries = true)
     public ApiResponse updateApi(UUID id, ApiRequest request, String providerId) {
         log.info("Atualizando API: {}", id);
         
@@ -155,7 +148,6 @@ public class ApiService {
     }
     
     @Transactional
-    @CachePut(value = "apis", key = "#id")
     public ApiResponse publishApi(UUID id, String providerId) {
         log.info("Publicando API: {}", id);
         
@@ -197,7 +189,6 @@ public class ApiService {
     }
     
     @Transactional
-    @CacheEvict(value = {"apis", "apiVersions", "apiEndpoints"}, allEntries = true)
     public void deleteApi(UUID id, String providerId) {
         log.info("Deletando API: {}", id);
         

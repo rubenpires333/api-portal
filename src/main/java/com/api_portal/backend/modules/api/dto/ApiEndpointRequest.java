@@ -27,6 +27,10 @@ public class ApiEndpointRequest {
     
     private Boolean requiresAuth = true;
     
+    private String authHeadersJson;
+    
+    private String authQueryParamsJson;
+    
     private String requestExample;
     
     private String responseExample;

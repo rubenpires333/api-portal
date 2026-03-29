@@ -43,6 +43,8 @@ public class ApiEndpointService {
             .description(request.getDescription())
             .tags(request.getTags())
             .requiresAuth(request.getRequiresAuth())
+            .authHeadersJson(request.getAuthHeadersJson())
+            .authQueryParamsJson(request.getAuthQueryParamsJson())
             .isDeprecated(false)
             .requestExample(request.getRequestExample())
             .responseExample(request.getResponseExample())
@@ -86,6 +88,8 @@ public class ApiEndpointService {
         endpoint.setDescription(request.getDescription());
         endpoint.setTags(request.getTags());
         endpoint.setRequiresAuth(request.getRequiresAuth());
+        endpoint.setAuthHeadersJson(request.getAuthHeadersJson());
+        endpoint.setAuthQueryParamsJson(request.getAuthQueryParamsJson());
         endpoint.setRequestExample(request.getRequestExample());
         endpoint.setResponseExample(request.getResponseExample());
         
@@ -118,6 +122,8 @@ public class ApiEndpointService {
             .description(endpoint.getDescription())
             .tags(endpoint.getTags())
             .requiresAuth(endpoint.getRequiresAuth())
+            .authHeadersJson(endpoint.getAuthHeadersJson())
+            .authQueryParamsJson(endpoint.getAuthQueryParamsJson())
             .isDeprecated(endpoint.getIsDeprecated())
             .requestExample(endpoint.getRequestExample())
             .responseExample(endpoint.getResponseExample())

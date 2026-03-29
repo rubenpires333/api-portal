@@ -19,6 +19,8 @@ public class ApiEndpointResponse {
     private String description;
     private List<String> tags;
     private Boolean requiresAuth;
+    private String authHeadersJson;
+    private String authQueryParamsJson;
     private Boolean isDeprecated;
     private String requestExample;
     private String responseExample;

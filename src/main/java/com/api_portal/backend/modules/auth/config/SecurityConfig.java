@@ -66,7 +66,8 @@ public class SecurityConfig {
                     "/api/v1/auth/oauth2/**",
                     "/api/v1/auth/verify-email",
                     "/actuator/**",
-                    "/error"
+                    "/error",
+                    "/gateway/api/**"
                 ).permitAll()
                 // Endpoints públicos de leitura (GET)
                 .requestMatchers(

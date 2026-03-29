@@ -58,6 +58,14 @@ WHERE code IN (
     'api.update',
     'api.delete',
     'api.publish',
+    'version.create',
+    'version.read',
+    'version.update',
+    'version.delete',
+    'endpoint.create',
+    'endpoint.read',
+    'endpoint.update',
+    'endpoint.delete',
     'category.read',
     'user.read'
 );

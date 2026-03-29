@@ -5,5 +5,6 @@ public enum AuthType {
     API_KEY,        // Autenticação via API Key
     OAUTH2,         // OAuth 2.0
     BASIC,          // Basic Authentication
-    BEARER          // Bearer Token
+    BEARER,          // Bearer Token
+    JWT
 }
