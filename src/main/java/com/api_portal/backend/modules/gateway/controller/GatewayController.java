@@ -18,7 +18,6 @@ import java.util.Map;
 @RestController
 @RequiredArgsConstructor
 @Tag(name = "Gateway", description = "Gateway intermediário para APIs")
-@CrossOrigin(origins = "http://localhost:4200", allowCredentials = "true")
 public class GatewayController {
     
     private final GatewayService gatewayService;
@@ -95,8 +94,8 @@ public class GatewayController {
                 String.class
             );
             
+            // Retornar apenas o body, sem copiar headers da API externa
             return ResponseEntity.status(response.getStatusCode())
-                .headers(response.getHeaders())
                 .body(response.getBody());
                 
         } catch (Exception e) {

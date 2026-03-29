@@ -92,12 +92,9 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Permitir origens do frontend
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:4200",
-            "http://localhost:3000",
-            "http://127.0.0.1:4200"
-        ));
+        // Permitir origens específicas em desenvolvimento
+        configuration.addAllowedOrigin("http://localhost:4200");
+        configuration.addAllowedOrigin("http://localhost:3000");
         
         // Permitir todos os métodos HTTP
         configuration.setAllowedMethods(Arrays.asList(
@@ -123,7 +120,7 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         
-        log.info("CORS configurado para permitir origens: {}", configuration.getAllowedOrigins());
+        log.info("CORS configurado para origens: http://localhost:4200, http://localhost:3000");
         
         return source;
     }
