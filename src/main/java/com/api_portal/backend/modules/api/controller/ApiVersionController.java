@@ -81,6 +81,21 @@ public class ApiVersionController {
         return ResponseEntity.ok(versionService.publishVersion(apiId, id, providerId));
     }
     
+    @PutMapping("/{id}")
+    @RequiresPermission("version.update")
+    @Operation(
+        summary = "Atualizar versão (apenas se não publicada)",
+        security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    public ResponseEntity<ApiVersionResponse> updateVersion(
+            @PathVariable UUID apiId,
+            @PathVariable UUID id,
+            @Valid @RequestBody ApiVersionRequest request,
+            Authentication authentication) {
+        String providerId = getUserId(authentication);
+        return ResponseEntity.ok(versionService.updateVersion(apiId, id, request, providerId));
+    }
+    
     @PatchMapping("/{id}/deprecate")
     @RequiresPermission("version.update")
     @Operation(

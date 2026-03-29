@@ -85,6 +85,17 @@ public class GatewayService {
             log.info("Gateway response: {} from {}", response.getStatusCode(), targetUrl);
             String responseBody = response.getBody();
             log.info("Response body length: {}", responseBody != null ? responseBody.length() : 0);
+            
+            // Validar tamanho da resposta (limite: 5MB)
+            final int MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB
+            if (responseBody != null && responseBody.length() > MAX_RESPONSE_SIZE) {
+                log.warn("Response too large: {} bytes (max: {})", responseBody.length(), MAX_RESPONSE_SIZE);
+                return ResponseEntity
+                    .status(HttpStatus.PAYLOAD_TOO_LARGE)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"error\":\"Response too large\",\"message\":\"A resposta da API excede o limite de 5MB. Use paginação ou filtre os dados.\",\"size\":" + responseBody.length() + ",\"maxSize\":" + MAX_RESPONSE_SIZE + "}");
+            }
+            
             log.info("Response body first 100 chars: {}", responseBody != null && responseBody.length() > 0 ? responseBody.substring(0, Math.min(100, responseBody.length())) : "EMPTY");
             
             // Criar headers limpos (sem duplicar CORS)

@@ -134,6 +134,48 @@ public class ApiVersionService {
     }
     
     @Transactional
+    public ApiVersionResponse updateVersion(UUID apiId, UUID versionId, ApiVersionRequest request, String providerId) {
+        Api api = apiRepository.findById(apiId)
+            .orElseThrow(() -> new ApiException("API não encontrada"));
+        
+        if (!api.getProviderId().equals(providerId)) {
+            throw new ApiException("Você não tem permissão");
+        }
+        
+        ApiVersion version = versionRepository.findById(versionId)
+            .orElseThrow(() -> new ApiException("Versão não encontrada"));
+        
+        if (!version.getApi().getId().equals(apiId)) {
+            throw new ApiException("Versão não pertence a esta API");
+        }
+        
+        if (version.getStatus() == ApiStatus.PUBLISHED) {
+            throw new ApiException("Versões publicadas não podem ser editadas");
+        }
+        
+        // Atualizar campos
+        version.setVersion(request.getVersion());
+        version.setDescription(request.getDescription());
+        version.setBaseUrl(request.getBaseUrl());
+        version.setOpenApiSpec(request.getOpenApiSpec());
+        
+        if (request.getIsDefault() && !version.getIsDefault()) {
+            versionRepository.findDefaultVersion(apiId)
+                .ifPresent(v -> {
+                    v.setIsDefault(false);
+                    versionRepository.save(v);
+                });
+            version.setIsDefault(true);
+        }
+        
+        version = versionRepository.save(version);
+        
+        log.info("Versão {} atualizada com sucesso", version.getVersion());
+        
+        return mapToResponse(version);
+    }
+    
+    @Transactional
     public ApiVersionResponse deprecateVersion(UUID id, String message, String providerId) {
         ApiVersion version = versionRepository.findById(id)
             .orElseThrow(() -> new ApiException("Versão não encontrada"));
