@@ -1,5 +1,6 @@
 package com.api_portal.backend.modules.api.controller;
 
+import com.api_portal.backend.modules.api.dto.ApiPublicResponse;
 import com.api_portal.backend.modules.api.dto.ApiRequest;
 import com.api_portal.backend.modules.api.dto.ApiResponse;
 import com.api_portal.backend.modules.api.service.ApiService;
@@ -55,6 +56,34 @@ public class ApiController {
     @Operation(summary = "Obter API por slug")
     public ResponseEntity<ApiResponse> getApiBySlug(@PathVariable String slug) {
         return ResponseEntity.ok(apiService.getApiBySlug(slug));
+    }
+    
+    @GetMapping("/consumer/explore")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "Explorar APIs públicas (Consumer)")
+    public ResponseEntity<Page<ApiPublicResponse>> exploreApis(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category,
+            @PageableDefault(size = 12, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            Authentication authentication) {
+        String consumerId = getUserId(authentication);
+        return ResponseEntity.ok(apiService.exploreApis(search, category, consumerId, pageable));
+    }
+    
+    @GetMapping("/consumer/{slug}")
+    @SecurityRequirement(name = "bearer-jwt")
+    @Operation(summary = "Detalhes da API para consumer")
+    public ResponseEntity<ApiPublicResponse> getApiDetailsForConsumer(
+            @PathVariable String slug,
+            Authentication authentication) {
+        String consumerId = getUserId(authentication);
+        return ResponseEntity.ok(apiService.getApiDetailsForConsumer(slug, consumerId));
+    }
+    
+    @GetMapping("/categories")
+    @Operation(summary = "Listar categorias disponíveis")
+    public ResponseEntity<List<String>> getCategories() {
+        return ResponseEntity.ok(apiService.getCategories());
     }
     
     @GetMapping("/my")

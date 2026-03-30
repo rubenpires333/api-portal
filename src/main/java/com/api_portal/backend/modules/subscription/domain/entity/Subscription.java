@@ -49,6 +49,13 @@ public class Subscription {
     @Column(name = "api_key", unique = true, nullable = false, length = 64)
     private String apiKey;
     
+    @Column(name = "requests_used")
+    @Builder.Default
+    private Integer requestsUsed = 0;
+    
+    @Column(name = "requests_limit")
+    private Integer requestsLimit;
+    
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
     

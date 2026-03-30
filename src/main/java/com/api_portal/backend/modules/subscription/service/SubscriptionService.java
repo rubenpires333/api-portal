@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -84,6 +85,34 @@ public class SubscriptionService {
         
         return subscriptionRepository.findByConsumerId(consumerId, pageable)
             .map(this::mapToResponse);
+    }
+    
+    /**
+     * Listar subscrições do consumer (sem paginação)
+     */
+    @Transactional(readOnly = true)
+    public List<SubscriptionResponse> getMySubscriptionsList(Authentication authentication) {
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String consumerId = jwt.getSubject();
+        
+        return subscriptionRepository.findByConsumerId(consumerId)
+            .stream()
+            .map(this::mapToResponse)
+            .toList();
+    }
+    
+    /**
+     * Verificar se tem subscrição ativa para uma API
+     */
+    @Transactional(readOnly = true)
+    public SubscriptionResponse getActiveSubscriptionByApiId(UUID apiId, Authentication authentication) {
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String consumerId = jwt.getSubject();
+        
+        return subscriptionRepository.findByConsumerIdAndApiIdAndStatus(
+                consumerId, apiId, SubscriptionStatus.ACTIVE)
+            .map(this::mapToResponse)
+            .orElse(null);
     }
     
     /**
@@ -255,6 +284,10 @@ public class SubscriptionService {
             .consumerName(subscription.getConsumerName())
             .status(subscription.getStatus())
             .apiKey(subscription.getApiKey())
+            .requestsUsed(subscription.getRequestsUsed() != null ? subscription.getRequestsUsed() : 0)
+            .requestsLimit(subscription.getRequestsLimit())
+            .startDate(subscription.getCreatedAt())
+            .endDate(subscription.getExpiresAt())
             .expiresAt(subscription.getExpiresAt())
             .approvedAt(subscription.getApprovedAt())
             .revokedAt(subscription.getRevokedAt())

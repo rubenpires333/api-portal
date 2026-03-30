@@ -19,7 +19,11 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     // Consumer queries
     Page<Subscription> findByConsumerId(String consumerId, Pageable pageable);
     
+    List<Subscription> findByConsumerId(String consumerId);
+    
     Optional<Subscription> findByConsumerIdAndApiId(String consumerId, UUID apiId);
+    
+    Optional<Subscription> findByConsumerIdAndApiIdAndStatus(String consumerId, UUID apiId, SubscriptionStatus status);
     
     boolean existsByConsumerIdAndApiIdAndStatus(String consumerId, UUID apiId, SubscriptionStatus status);
     

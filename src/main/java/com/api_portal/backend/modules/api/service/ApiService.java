@@ -3,11 +3,15 @@ package com.api_portal.backend.modules.api.service;
 import com.api_portal.backend.modules.api.domain.Api;
 import com.api_portal.backend.modules.api.domain.ApiCategory;
 import com.api_portal.backend.modules.api.domain.enums.ApiStatus;
+import com.api_portal.backend.modules.api.dto.ApiPublicResponse;
 import com.api_portal.backend.modules.api.dto.ApiRequest;
 import com.api_portal.backend.modules.api.dto.ApiResponse;
+import com.api_portal.backend.modules.api.dto.EndpointPublicDto;
 import com.api_portal.backend.modules.api.exception.ApiException;
 import com.api_portal.backend.modules.api.repository.ApiCategoryRepository;
 import com.api_portal.backend.modules.api.repository.ApiRepository;
+import com.api_portal.backend.modules.subscription.domain.enums.SubscriptionStatus;
+import com.api_portal.backend.modules.subscription.domain.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -27,6 +31,7 @@ public class ApiService {
     
     private final ApiRepository apiRepository;
     private final ApiCategoryRepository categoryRepository;
+    private final SubscriptionRepository subscriptionRepository;
     
     @Transactional
     public ApiResponse createApi(ApiRequest request, String providerId, String providerName, String providerEmail) {
@@ -202,6 +207,56 @@ public class ApiService {
         apiRepository.delete(api);
     }
     
+    @Transactional(readOnly = true)
+    public Page<ApiPublicResponse> exploreApis(
+            String search, 
+            String category, 
+            String consumerId, 
+            Pageable pageable) {
+        
+        Page<Api> apis;
+        
+        if (search != null && !search.isEmpty()) {
+            apis = apiRepository.searchApis(search, pageable);
+        } else {
+            apis = apiRepository.findPublicApis(ApiStatus.PUBLISHED, pageable);
+        }
+        
+        return apis.map(api -> mapToPublicResponse(api, consumerId));
+    }
+    
+    @Transactional(readOnly = true)
+    public ApiPublicResponse getApiDetailsForConsumer(String slug, String consumerId) {
+        Api api = apiRepository.findBySlug(slug)
+            .orElseThrow(() -> new ApiException("API não encontrada"));
+        
+        if (api.getStatus() != ApiStatus.PUBLISHED) {
+            throw new ApiException("API não está disponível");
+        }
+        
+        return mapToPublicResponse(api, consumerId);
+    }
+
+    @Transactional(readOnly = true)
+    public ApiPublicResponse getApiDetailsForConsumer(UUID id, String consumerId) {
+        Api api = apiRepository.findById(id)
+            .orElseThrow(() -> new ApiException("API não encontrada"));
+        
+        if (api.getStatus() != ApiStatus.PUBLISHED) {
+            throw new ApiException("API não está disponível");
+        }
+        
+        return mapToPublicResponse(api, consumerId);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<String> getCategories() {
+        return categoryRepository.findAll()
+            .stream()
+            .map(ApiCategory::getName)
+            .collect(Collectors.toList());
+    }
+    
     private ApiResponse mapToResponse(Api api) {
         return ApiResponse.builder()
             .id(api.getId())
@@ -241,6 +296,77 @@ public class ApiService {
                     .status(v.getStatus())
                     .build())
                 .collect(Collectors.toList()))
+            .createdAt(api.getCreatedAt())
+            .updatedAt(api.getUpdatedAt())
+            .publishedAt(api.getPublishedAt())
+            .build();
+    }
+    
+    private ApiPublicResponse mapToPublicResponse(Api api, String consumerId) {
+        boolean isSubscribed = false;
+        UUID subscriptionId = null;
+        
+        if (consumerId != null) {
+            var subscription = subscriptionRepository.findByConsumerIdAndApiIdAndStatus(
+                consumerId, api.getId(), SubscriptionStatus.ACTIVE);
+            
+            if (subscription.isPresent()) {
+                isSubscribed = true;
+                subscriptionId = subscription.get().getId();
+            }
+        }
+        
+        List<EndpointPublicDto> endpoints = List.of();
+        if (api.getVersions() != null && !api.getVersions().isEmpty()) {
+            var defaultVersion = api.getVersions().stream()
+                .filter(v -> v.getIsDefault() != null && v.getIsDefault())
+                .findFirst();
+            
+            if (defaultVersion.isPresent() && defaultVersion.get().getEndpoints() != null) {
+                endpoints = defaultVersion.get().getEndpoints().stream()
+                    .map(e -> EndpointPublicDto.builder()
+                        .id(e.getId())
+                        .path(e.getPath())
+                        .method(e.getMethod())
+                        .description(e.getDescription())
+                        .build())
+                    .collect(Collectors.toList());
+            }
+        }
+        
+        return ApiPublicResponse.builder()
+            .id(api.getId())
+            .name(api.getName())
+            .slug(api.getSlug())
+            .shortDescription(api.getShortDescription())
+            .description(api.getDescription())
+            .category(api.getCategory() != null ? ApiPublicResponse.CategorySummary.builder()
+                .id(api.getCategory().getId())
+                .name(api.getCategory().getName())
+                .slug(api.getCategory().getSlug())
+                .build() : null)
+            .visibility(api.getVisibility())
+            .provider(ApiPublicResponse.ProviderInfo.builder()
+                .id(api.getProviderId())
+                .name(api.getProviderName())
+                .email(api.getProviderEmail())
+                .build())
+            .tags(api.getTags())
+            .baseUrl(api.getBaseUrl())
+            .documentationUrl(api.getDocumentationUrl())
+            .termsOfServiceUrl(api.getTermsOfServiceUrl())
+            .endpoints(endpoints)
+            .versions(api.getVersions() != null ? api.getVersions().stream()
+                .map(v -> ApiPublicResponse.VersionSummary.builder()
+                    .id(v.getId())
+                    .version(v.getVersion())
+                    .isDefault(v.getIsDefault())
+                    .isDeprecated(v.getIsDeprecated())
+                    .status(v.getStatus())
+                    .build())
+                .collect(Collectors.toList()) : List.of())
+            .isSubscribed(isSubscribed)
+            .subscriptionId(subscriptionId)
             .createdAt(api.getCreatedAt())
             .updatedAt(api.getUpdatedAt())
             .publishedAt(api.getPublishedAt())

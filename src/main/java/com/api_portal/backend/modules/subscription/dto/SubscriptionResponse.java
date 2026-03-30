@@ -25,6 +25,10 @@ public class SubscriptionResponse {
     private String consumerName;
     private SubscriptionStatus status;
     private String apiKey;
+    private Integer requestsUsed;
+    private Integer requestsLimit;
+    private LocalDateTime startDate;
+    private LocalDateTime endDate;
     private LocalDateTime expiresAt;
     private LocalDateTime approvedAt;
     private LocalDateTime revokedAt;
