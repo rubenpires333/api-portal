@@ -41,4 +41,6 @@ public interface ApiRepository extends JpaRepository<Api, UUID> {
     Page<Api> findByTags(@Param("tags") List<String> tags, Pageable pageable);
     
     boolean existsBySlug(String slug);
+    
+    long countByProviderId(String providerId);
 }
