@@ -283,14 +283,14 @@ public class SubscriptionService {
      * Mapear entidade para DTO
      */
     private SubscriptionResponse mapToResponse(Subscription subscription) {
-        // Buscar versão default ou usar "latest"
-        String apiVersion = "latest";
-        if (subscription.getApi().getVersions() != null && !subscription.getApi().getVersions().isEmpty()) {
+        // Buscar versão da subscription
+        String apiVersion = "N/A";
+        if (subscription.getApiVersionId() != null && subscription.getApi().getVersions() != null) {
             apiVersion = subscription.getApi().getVersions().stream()
-                .filter(v -> v.getIsDefault() != null && v.getIsDefault())
+                .filter(v -> v.getId().equals(subscription.getApiVersionId()))
                 .findFirst()
                 .map(v -> v.getVersion())
-                .orElse("latest");
+                .orElse("N/A");
         }
         
         return SubscriptionResponse.builder()
