@@ -81,6 +81,13 @@ public class SubscriptionController {
         return ResponseEntity.ok(subscriptions);
     }
     
+    @GetMapping("/provider/pending/count")
+    @Operation(summary = "Contar subscrições pendentes (Provider)")
+    public ResponseEntity<Long> getPendingSubscriptionsCount(Authentication authentication) {
+        long count = subscriptionService.getPendingSubscriptionsCount(authentication);
+        return ResponseEntity.ok(count);
+    }
+    
     @PutMapping("/provider/{id}/approve")
     @Operation(summary = "Aprovar subscrição (Provider)")
     public ResponseEntity<SubscriptionResponse> approveSubscription(

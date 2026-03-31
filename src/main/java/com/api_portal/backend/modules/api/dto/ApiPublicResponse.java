@@ -36,6 +36,8 @@ public class ApiPublicResponse {
     private List<VersionSummary> versions;
     private Boolean isSubscribed;
     private UUID subscriptionId;
+    private String subscriptionStatus;
+    private Boolean requiresApproval;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime publishedAt;

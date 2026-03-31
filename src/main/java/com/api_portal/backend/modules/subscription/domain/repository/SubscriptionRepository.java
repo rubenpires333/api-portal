@@ -54,6 +54,9 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     @Query("SELECT COUNT(s) FROM Subscription s WHERE s.api.providerId = :providerId AND s.status = 'ACTIVE'")
     long countActiveByProviderId(@Param("providerId") String providerId);
     
+    @Query("SELECT COUNT(s) FROM Subscription s WHERE s.api.providerId = :providerId AND s.status = :status")
+    long countByProviderIdAndStatus(@Param("providerId") String providerId, @Param("status") SubscriptionStatus status);
+    
     @Query("SELECT COUNT(s) FROM Subscription s WHERE s.api.id = :apiId AND s.status = 'ACTIVE'")
     long countActiveByApiId(@Param("apiId") UUID apiId);
 }

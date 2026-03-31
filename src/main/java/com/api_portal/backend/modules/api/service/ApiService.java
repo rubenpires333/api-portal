@@ -320,18 +320,32 @@ public class ApiService {
     private ApiPublicResponse mapToPublicResponse(Api api, String consumerId) {
         boolean isSubscribed = false;
         UUID subscriptionId = null;
+        String subscriptionStatus = null;
         final UUID subscribedVersionId;
         
         if (consumerId != null) {
+            // Primeiro verifica se tem subscrição ACTIVE
             var subscription = subscriptionRepository.findByConsumerIdAndApiIdAndStatus(
                 consumerId, api.getId(), SubscriptionStatus.ACTIVE);
             
             if (subscription.isPresent()) {
                 isSubscribed = true;
                 subscriptionId = subscription.get().getId();
+                subscriptionStatus = "ACTIVE";
                 subscribedVersionId = subscription.get().getApiVersionId();
             } else {
-                subscribedVersionId = null;
+                // Se não tem ACTIVE, verifica se tem PENDING
+                var pendingSubscription = subscriptionRepository.findByConsumerIdAndApiIdAndStatus(
+                    consumerId, api.getId(), SubscriptionStatus.PENDING);
+                
+                if (pendingSubscription.isPresent()) {
+                    isSubscribed = true;
+                    subscriptionId = pendingSubscription.get().getId();
+                    subscriptionStatus = "PENDING";
+                    subscribedVersionId = null; // Não tem versão até ser aprovada
+                } else {
+                    subscribedVersionId = null;
+                }
             }
         } else {
             subscribedVersionId = null;
@@ -425,6 +439,8 @@ public class ApiService {
                 .collect(Collectors.toList()) : List.of())
             .isSubscribed(isSubscribed)
             .subscriptionId(subscriptionId)
+            .subscriptionStatus(subscriptionStatus)
+            .requiresApproval(api.getRequiresApproval())
             .createdAt(api.getCreatedAt())
             .updatedAt(api.getUpdatedAt())
             .publishedAt(api.getPublishedAt())

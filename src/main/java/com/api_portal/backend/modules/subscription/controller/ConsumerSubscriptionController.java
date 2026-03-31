@@ -42,12 +42,12 @@ public class ConsumerSubscriptionController {
     }
     
     @GetMapping("/check/{apiId}")
-    @Operation(summary = "Verificar se tenho subscricao ativa para uma API")
+    @Operation(summary = "Verificar se tenho subscricao ativa ou pendente para uma API")
     public ResponseEntity<Map<String, Object>> hasActiveSubscription(
             @PathVariable UUID apiId,
             Authentication authentication) {
         Map<String, Object> response = new HashMap<>();
-        SubscriptionResponse subscription = subscriptionService.getActiveSubscriptionByApiId(apiId, authentication);
+        SubscriptionResponse subscription = subscriptionService.getActiveOrPendingSubscriptionByApiId(apiId, authentication);
         
         if (subscription != null) {
             response.put("hasSubscription", true);

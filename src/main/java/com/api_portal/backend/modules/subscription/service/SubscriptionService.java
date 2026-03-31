@@ -50,10 +50,15 @@ public class SubscriptionService {
             throw new IllegalStateException("Apenas APIs publicadas podem ser subscritas");
         }
         
-        // Verificar se já existe subscrição ativa
+        // Verificar se já existe subscrição ativa ou pendente
         if (subscriptionRepository.existsByConsumerIdAndApiIdAndStatus(
                 consumerId, request.getApiId(), SubscriptionStatus.ACTIVE)) {
             throw new IllegalStateException("Já existe uma subscrição ativa para esta API");
+        }
+        
+        if (subscriptionRepository.existsByConsumerIdAndApiIdAndStatus(
+                consumerId, request.getApiId(), SubscriptionStatus.PENDING)) {
+            throw new IllegalStateException("Já existe uma subscrição pendente de aprovação para esta API");
         }
         
         // Buscar versão padrão da API
@@ -75,25 +80,41 @@ public class SubscriptionService {
             }
         }
         
-        // Criar subscrição (aprovação automática por enquanto)
+        // Criar subscrição
+        // Se a API requer aprovação, criar com status PENDING
+        // Caso contrário, aprovar automaticamente
+        SubscriptionStatus initialStatus = api.getRequiresApproval() 
+            ? SubscriptionStatus.PENDING 
+            : SubscriptionStatus.ACTIVE;
+        
+        LocalDateTime approvedAt = api.getRequiresApproval() 
+            ? null 
+            : LocalDateTime.now();
+        
         Subscription subscription = Subscription.builder()
             .api(api)
             .apiVersionId(defaultVersionId)
             .consumerId(consumerId)
             .consumerEmail(consumerEmail)
             .consumerName(consumerName)
-            .status(SubscriptionStatus.ACTIVE)
+            .status(initialStatus)
             .apiKey(generateApiKey())
-            .approvedAt(LocalDateTime.now())
+            .approvedAt(approvedAt)
             .notes(request.getNotes())
             .requestsUsed(0)
-            .requestsLimit(api.getRateLimit() != null ? api.getRateLimit() : 1000) // Usar rate limit da API ou padrão 1000
-            .lastResetAt(LocalDateTime.now()) // Inicializar com data atual
+            .requestsLimit(api.getRateLimit() != null ? api.getRateLimit() : 1000)
+            .lastResetAt(initialStatus == SubscriptionStatus.ACTIVE ? LocalDateTime.now() : null)
             .build();
         
         subscription = subscriptionRepository.save(subscription);
         
-        log.info("Nova subscrição criada: {} para API: {}", subscription.getId(), api.getName());
+        if (initialStatus == SubscriptionStatus.PENDING) {
+            log.info("Nova subscrição PENDENTE criada: {} para API: {} (requer aprovação)", 
+                subscription.getId(), api.getName());
+        } else {
+            log.info("Nova subscrição ATIVA criada: {} para API: {}", 
+                subscription.getId(), api.getName());
+        }
         
         return mapToResponse(subscription);
     }
@@ -136,6 +157,29 @@ public class SubscriptionService {
                 consumerId, apiId, SubscriptionStatus.ACTIVE)
             .map(this::mapToResponse)
             .orElse(null);
+    }
+    
+    /**
+     * Verificar se tem subscrição ativa ou pendente para uma API
+     */
+    @Transactional(readOnly = true)
+    public SubscriptionResponse getActiveOrPendingSubscriptionByApiId(UUID apiId, Authentication authentication) {
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String consumerId = jwt.getSubject();
+        
+        // Primeiro tenta encontrar ativa
+        var activeSubscription = subscriptionRepository.findByConsumerIdAndApiIdAndStatus(
+                consumerId, apiId, SubscriptionStatus.ACTIVE);
+        
+        if (activeSubscription.isPresent()) {
+            return mapToResponse(activeSubscription.get());
+        }
+        
+        // Se não encontrar ativa, tenta encontrar pendente
+        var pendingSubscription = subscriptionRepository.findByConsumerIdAndApiIdAndStatus(
+                consumerId, apiId, SubscriptionStatus.PENDING);
+        
+        return pendingSubscription.map(this::mapToResponse).orElse(null);
     }
     
     /**
@@ -202,6 +246,17 @@ public class SubscriptionService {
         }
         
         return subscriptions.map(this::mapToResponse);
+    }
+    
+    /**
+     * Contar subscrições pendentes do provider
+     */
+    @Transactional(readOnly = true)
+    public long getPendingSubscriptionsCount(Authentication authentication) {
+        Jwt jwt = (Jwt) authentication.getPrincipal();
+        String providerId = jwt.getSubject();
+        
+        return subscriptionRepository.countByProviderIdAndStatus(providerId, SubscriptionStatus.PENDING);
     }
     
     /**
