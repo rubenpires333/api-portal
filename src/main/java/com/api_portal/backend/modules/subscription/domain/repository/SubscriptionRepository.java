@@ -59,4 +59,11 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     
     @Query("SELECT COUNT(s) FROM Subscription s WHERE s.api.id = :apiId AND s.status = 'ACTIVE'")
     long countActiveByApiId(@Param("apiId") UUID apiId);
+    
+    // Analytics queries
+    @Query("SELECT s.api.id, SUM(s.requestsUsed) FROM Subscription s WHERE s.api.providerId = :providerId AND s.status = 'ACTIVE' GROUP BY s.api.id")
+    List<Object[]> findProviderSubscriptionStats(@Param("providerId") String providerId);
+    
+    @Query("SELECT s.consumerEmail, s.consumerName, SUM(s.requestsUsed) FROM Subscription s WHERE s.api.providerId = :providerId AND s.status = 'ACTIVE' GROUP BY s.consumerEmail, s.consumerName ORDER BY SUM(s.requestsUsed) DESC")
+    List<Object[]> findTopConsumersByProvider(@Param("providerId") String providerId);
 }

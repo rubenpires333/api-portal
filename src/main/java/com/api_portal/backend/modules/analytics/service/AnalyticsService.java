@@ -11,9 +11,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -35,59 +33,46 @@ public class AnalyticsService {
         Jwt jwt = (Jwt) authentication.getPrincipal();
         String providerId = jwt.getSubject();
         
-        // Métricas gerais
-        Long totalRequests = analyticsRepository.countTotalRequests(startDate, endDate);
-        Long totalErrors = analyticsRepository.countTotalErrors(startDate, endDate);
-        Double errorRate = totalRequests > 0 ? (totalErrors * 100.0 / totalRequests) : 0.0;
-        Double averageLatency = analyticsRepository.calculateAverageLatency(startDate, endDate);
+        // Buscar todas as subscrições do provider
+        List<Object[]> subscriptionStats = subscriptionRepository.findProviderSubscriptionStats(providerId);
+        
+        Long totalRequests = 0L;
+        Long totalSubscriptions = 0L;
+        
+        for (Object[] row : subscriptionStats) {
+            totalRequests += ((Number) row[1]).longValue(); // requestsUsed
+            totalSubscriptions++;
+        }
+        
+        // Calcular métricas básicas
+        Long totalErrors = 0L; // Pode ser implementado futuramente com logs
+        Double errorRate = 0.0;
+        Double averageLatency = 0.0; // Pode ser implementado futuramente com logs
         
         // Contar APIs do provider
         Long totalApis = apiRepository.countByProviderId(providerId);
         
-        // Contar subscrições ativas
-        Long totalSubscriptions = subscriptionRepository.countActiveByProviderId(providerId);
-        
-        // Top consumers
-        List<TopConsumerDto> topConsumers = analyticsRepository.findTopConsumers(startDate, endDate, 5)
+        // Top consumers baseado em requestsUsed
+        List<TopConsumerDto> topConsumers = subscriptionRepository.findTopConsumersByProvider(providerId)
             .stream()
+            .limit(5)
             .map(row -> TopConsumerDto.builder()
                 .email((String) row[0])
-                .requestCount(((Number) row[1]).longValue())
-                .build())
-            .collect(Collectors.toList());
-        
-        // Top endpoints
-        List<TopEndpointDto> topEndpoints = analyticsRepository.findTopEndpoints(startDate, endDate, 10)
-            .stream()
-            .map(row -> TopEndpointDto.builder()
-                .endpoint((String) row[0])
-                .method((String) row[1])
+                .name((String) row[1])
                 .requestCount(((Number) row[2]).longValue())
-                .averageLatency(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0)
                 .build())
             .collect(Collectors.toList());
         
-        // Requests por método HTTP
-        Map<String, Long> requestsByMethod = analyticsRepository.countRequestsByMethod(startDate, endDate)
-            .stream()
-            .collect(Collectors.toMap(
-                row -> (String) row[0],
-                row -> ((Number) row[1]).longValue()
-            ));
-        
-        // Requests por status
-        Map<String, Long> requestsByStatus = analyticsRepository.countRequestsByStatus(startDate, endDate)
-            .stream()
-            .collect(Collectors.toMap(
-                row -> (String) row[0],
-                row -> ((Number) row[1]).longValue()
-            ));
+        // Dados vazios para campos que requerem sistema de logs
+        List<TopEndpointDto> topEndpoints = new ArrayList<>();
+        Map<String, Long> requestsByMethod = new HashMap<>();
+        Map<String, Long> requestsByStatus = new HashMap<>();
         
         return AnalyticsSummaryResponse.builder()
             .totalRequests(totalRequests)
             .totalErrors(totalErrors)
-            .errorRate(Math.round(errorRate * 100.0) / 100.0)
-            .averageLatency(averageLatency != null ? Math.round(averageLatency * 100.0) / 100.0 : 0.0)
+            .errorRate(errorRate)
+            .averageLatency(averageLatency)
             .totalApis(totalApis)
             .totalSubscriptions(totalSubscriptions)
             .topConsumers(topConsumers)
