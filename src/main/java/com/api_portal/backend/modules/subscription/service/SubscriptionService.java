@@ -56,9 +56,29 @@ public class SubscriptionService {
             throw new IllegalStateException("Já existe uma subscrição ativa para esta API");
         }
         
+        // Buscar versão padrão da API
+        UUID defaultVersionId = null;
+        if (api.getVersions() != null && !api.getVersions().isEmpty()) {
+            var defaultVersion = api.getVersions().stream()
+                .filter(v -> v.getIsDefault() != null && v.getIsDefault())
+                .findFirst();
+            
+            if (defaultVersion.isPresent()) {
+                defaultVersionId = defaultVersion.get().getId();
+            } else {
+                // Se não houver versão padrão, usar a primeira versão publicada
+                defaultVersionId = api.getVersions().stream()
+                    .filter(v -> v.getStatus() == com.api_portal.backend.modules.api.domain.enums.ApiStatus.PUBLISHED)
+                    .findFirst()
+                    .map(v -> v.getId())
+                    .orElse(null);
+            }
+        }
+        
         // Criar subscrição (aprovação automática por enquanto)
         Subscription subscription = Subscription.builder()
             .api(api)
+            .apiVersionId(defaultVersionId)
             .consumerId(consumerId)
             .consumerEmail(consumerEmail)
             .consumerName(consumerName)
@@ -276,6 +296,7 @@ public class SubscriptionService {
         return SubscriptionResponse.builder()
             .id(subscription.getId())
             .apiId(subscription.getApi().getId())
+            .apiVersionId(subscription.getApiVersionId())
             .apiName(subscription.getApi().getName())
             .apiSlug(subscription.getApi().getSlug())
             .apiVersion(apiVersion)

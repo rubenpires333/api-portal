@@ -33,6 +33,9 @@ public class Subscription {
     @JoinColumn(name = "api_id", nullable = false)
     private Api api;
     
+    @Column(name = "api_version_id")
+    private UUID apiVersionId;
+    
     @Column(name = "consumer_id", nullable = false)
     private String consumerId; // Keycloak user ID
     

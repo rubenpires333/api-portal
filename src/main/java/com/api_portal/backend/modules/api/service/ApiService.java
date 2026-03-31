@@ -227,7 +227,7 @@ public class ApiService {
     
     @Transactional(readOnly = true)
     public ApiPublicResponse getApiDetailsForConsumer(String slug, String consumerId) {
-        Api api = apiRepository.findBySlug(slug)
+        Api api = apiRepository.findBySlugWithVersions(slug)
             .orElseThrow(() -> new ApiException("API não encontrada"));
         
         if (api.getStatus() != ApiStatus.PUBLISHED) {
@@ -239,7 +239,7 @@ public class ApiService {
 
     @Transactional(readOnly = true)
     public ApiPublicResponse getApiDetailsForConsumer(UUID id, String consumerId) {
-        Api api = apiRepository.findById(id)
+        Api api = apiRepository.findByIdWithVersions(id)
             .orElseThrow(() -> new ApiException("API não encontrada"));
         
         if (api.getStatus() != ApiStatus.PUBLISHED) {
@@ -305,6 +305,7 @@ public class ApiService {
     private ApiPublicResponse mapToPublicResponse(Api api, String consumerId) {
         boolean isSubscribed = false;
         UUID subscriptionId = null;
+        final UUID subscribedVersionId;
         
         if (consumerId != null) {
             var subscription = subscriptionRepository.findByConsumerIdAndApiIdAndStatus(
@@ -313,24 +314,63 @@ public class ApiService {
             if (subscription.isPresent()) {
                 isSubscribed = true;
                 subscriptionId = subscription.get().getId();
+                subscribedVersionId = subscription.get().getApiVersionId();
+            } else {
+                subscribedVersionId = null;
             }
+        } else {
+            subscribedVersionId = null;
         }
         
         List<EndpointPublicDto> endpoints = List.of();
+        
         if (api.getVersions() != null && !api.getVersions().isEmpty()) {
-            var defaultVersion = api.getVersions().stream()
-                .filter(v -> v.getIsDefault() != null && v.getIsDefault())
-                .findFirst();
+            // Se o consumer está subscrito, usar a versão da subscription
+            var selectedVersion = java.util.Optional.<com.api_portal.backend.modules.api.domain.ApiVersion>empty();
             
-            if (defaultVersion.isPresent() && defaultVersion.get().getEndpoints() != null) {
-                endpoints = defaultVersion.get().getEndpoints().stream()
-                    .map(e -> EndpointPublicDto.builder()
-                        .id(e.getId())
-                        .path(e.getPath())
-                        .method(e.getMethod())
-                        .description(e.getDescription())
-                        .build())
-                    .collect(Collectors.toList());
+            if (subscribedVersionId != null) {
+                selectedVersion = api.getVersions().stream()
+                    .filter(v -> v.getId().equals(subscribedVersionId))
+                    .findFirst();
+            }
+            
+            // Se não encontrou a versão subscrita, usar versão padrão
+            if (selectedVersion.isEmpty()) {
+                selectedVersion = api.getVersions().stream()
+                    .filter(v -> v.getIsDefault() != null && v.getIsDefault())
+                    .findFirst();
+            }
+            
+            // Se não houver versão padrão, usar primeira versão publicada
+            if (selectedVersion.isEmpty()) {
+                selectedVersion = api.getVersions().stream()
+                    .filter(v -> v.getStatus() == ApiStatus.PUBLISHED)
+                    .findFirst();
+            }
+            
+            // Se ainda não houver, usar primeira versão disponível
+            if (selectedVersion.isEmpty() && !api.getVersions().isEmpty()) {
+                selectedVersion = api.getVersions().stream().findFirst();
+            }
+            
+            if (selectedVersion.isPresent()) {
+                var version = selectedVersion.get();
+                
+                // Explicitly access endpoints to trigger lazy loading within transaction
+                var versionEndpoints = version.getEndpoints();
+                // Force initialization by calling size()
+                versionEndpoints.size();
+                
+                if (!versionEndpoints.isEmpty()) {
+                    endpoints = versionEndpoints.stream()
+                        .map(e -> EndpointPublicDto.builder()
+                            .id(e.getId())
+                            .path(e.getPath())
+                            .method(e.getMethod())
+                            .description(e.getDescription())
+                            .build())
+                        .collect(Collectors.toList());
+                }
             }
         }
         
@@ -355,6 +395,9 @@ public class ApiService {
             .baseUrl(api.getBaseUrl())
             .documentationUrl(api.getDocumentationUrl())
             .termsOfServiceUrl(api.getTermsOfServiceUrl())
+            .authType(api.getAuthType())
+            .rateLimit(api.getRateLimit())
+            .rateLimitPeriod(api.getRateLimitPeriod())
             .endpoints(endpoints)
             .versions(api.getVersions() != null ? api.getVersions().stream()
                 .map(v -> ApiPublicResponse.VersionSummary.builder()

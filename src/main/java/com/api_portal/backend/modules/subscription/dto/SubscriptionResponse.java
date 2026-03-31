@@ -17,6 +17,7 @@ public class SubscriptionResponse {
     
     private UUID id;
     private UUID apiId;
+    private UUID apiVersionId;
     private String apiName;
     private String apiSlug;
     private String apiVersion;

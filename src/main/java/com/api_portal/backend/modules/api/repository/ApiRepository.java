@@ -19,6 +19,12 @@ public interface ApiRepository extends JpaRepository<Api, UUID> {
     
     Optional<Api> findBySlug(String slug);
     
+    @Query("SELECT DISTINCT a FROM Api a LEFT JOIN FETCH a.versions WHERE a.id = :id")
+    Optional<Api> findByIdWithVersions(@Param("id") UUID id);
+    
+    @Query("SELECT DISTINCT a FROM Api a LEFT JOIN FETCH a.versions WHERE a.slug = :slug")
+    Optional<Api> findBySlugWithVersions(@Param("slug") String slug);
+    
     List<Api> findByProviderId(String providerId);
     
     Page<Api> findByStatus(ApiStatus status, Pageable pageable);

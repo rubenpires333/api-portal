@@ -2,6 +2,7 @@ package com.api_portal.backend.modules.api.dto;
 
 import com.api_portal.backend.modules.api.domain.enums.ApiStatus;
 import com.api_portal.backend.modules.api.domain.enums.ApiVisibility;
+import com.api_portal.backend.modules.api.domain.enums.AuthType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,6 +28,10 @@ public class ApiPublicResponse {
     private List<String> tags;
     private String baseUrl;
     private String documentationUrl;
+    private String termsOfServiceUrl;
+    private AuthType authType;
+    private Integer rateLimit;
+    private String rateLimitPeriod;
     private List<EndpointPublicDto> endpoints;
     private List<VersionSummary> versions;
     private Boolean isSubscribed;
@@ -34,7 +39,6 @@ public class ApiPublicResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime publishedAt;
-    private String termsOfServiceUrl;
     
     @Data
     @Builder
