@@ -257,6 +257,21 @@ public class ApiService {
             .collect(Collectors.toList());
     }
     
+    /**
+     * Gerar API Key de teste para o provider testar sua própria API via gateway
+     */
+    public String generateProviderTestApiKey(UUID apiId, String providerId) {
+        Api api = apiRepository.findById(apiId)
+            .orElseThrow(() -> new ApiException("API não encontrada"));
+        
+        if (!api.getProviderId().equals(providerId)) {
+            throw new ApiException("Você não tem permissão para gerar API Key de teste para esta API");
+        }
+        
+        // Formato: test_provider_{providerId}_{apiId}
+        return "test_provider_" + providerId + "_" + apiId.toString();
+    }
+    
     private ApiResponse mapToResponse(Api api) {
         return ApiResponse.builder()
             .id(api.getId())

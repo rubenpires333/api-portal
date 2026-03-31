@@ -169,6 +169,21 @@ public class ApiController {
         return ResponseEntity.noContent().build();
     }
     
+    @GetMapping("/{id}/test-api-key")
+    @RequiresPermission("api.read")
+    @Operation(
+        summary = "Obter API Key de teste para testar a API via gateway",
+        description = "Gera uma API Key especial que permite ao provider testar sua própria API através do gateway",
+        security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    public ResponseEntity<String> getTestApiKey(
+            @PathVariable UUID id,
+            Authentication authentication) {
+        String providerId = getUserId(authentication);
+        String testApiKey = apiService.generateProviderTestApiKey(id, providerId);
+        return ResponseEntity.ok(testApiKey);
+    }
+    
     private String getUserId(Authentication authentication) {
         Jwt jwt = (Jwt) authentication.getPrincipal();
         return jwt.getSubject();

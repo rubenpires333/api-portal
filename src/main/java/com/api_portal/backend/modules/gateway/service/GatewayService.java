@@ -41,37 +41,73 @@ public class GatewayService {
                 .body("{\"error\":\"Unauthorized\",\"message\":\"API Key é obrigatória. Adicione o header X-API-Key.\"}");
         }
         
-        // 2. Validar subscrição
-        Subscription subscription;
-        try {
-            subscription = subscriptionService.validateApiKey(apiKey);
-            log.info("API Key válida para consumer: {}", subscription.getConsumerEmail());
-            
-            // Adicionar informações da subscrição ao request para audit log
-            request.setAttribute("subscriptionId", subscription.getId().toString());
-            request.setAttribute("consumerId", subscription.getConsumerId());
-            request.setAttribute("consumerEmail", subscription.getConsumerEmail());
-        } catch (Exception e) {
-            log.error("API Key inválida: {}", apiKey);
-            return ResponseEntity
-                .status(HttpStatus.UNAUTHORIZED)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body("{\"error\":\"Unauthorized\",\"message\":\"API Key inválida ou inativa.\"}");
-        }
-        
-        // 3. Buscar API pelo slug
+        // 2. Buscar API pelo slug primeiro (para verificar se é teste do provider)
         Api api = apiRepository.findBySlug(slug)
             .orElseThrow(() -> new ApiException("API não encontrada: " + slug));
         
         log.info("API encontrada: {} ({})", api.getName(), api.getBaseUrl());
         
-        // 4. Verificar se a subscrição é para esta API
-        if (!subscription.getApi().getId().equals(api.getId())) {
-            log.error("API Key não autorizada para esta API");
-            return ResponseEntity
-                .status(HttpStatus.FORBIDDEN)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body("{\"error\":\"Forbidden\",\"message\":\"API Key não autorizada para esta API.\"}");
+        // 3. Verificar se é uma API Key de teste do provider
+        boolean isProviderTest = false;
+        String consumerId = null;
+        String consumerEmail = null;
+        
+        // API Key de teste do provider tem formato: test_provider_{providerId}_{apiId}
+        if (apiKey.startsWith("test_provider_")) {
+            String[] parts = apiKey.split("_");
+            if (parts.length >= 4) {
+                String providerId = parts[2];
+                // Verificar se o provider é dono da API
+                if (api.getProviderId().equals(providerId)) {
+                    isProviderTest = true;
+                    consumerId = providerId;
+                    consumerEmail = api.getProviderEmail();
+                    log.info("Provider test mode: {} testando sua própria API", api.getProviderName());
+                } else {
+                    log.error("Provider {} tentando testar API de outro provider", providerId);
+                    return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":\"Forbidden\",\"message\":\"Você não tem permissão para testar esta API.\"}");
+                }
+            }
+        }
+        
+        // 4. Se não for teste do provider, validar subscrição normal
+        if (!isProviderTest) {
+            Subscription subscription;
+            try {
+                subscription = subscriptionService.validateApiKey(apiKey);
+                log.info("API Key válida para consumer: {}", subscription.getConsumerEmail());
+                
+                consumerId = subscription.getConsumerId();
+                consumerEmail = subscription.getConsumerEmail();
+                
+                // Adicionar informações da subscrição ao request para audit log
+                request.setAttribute("subscriptionId", subscription.getId().toString());
+                request.setAttribute("consumerId", subscription.getConsumerId());
+                request.setAttribute("consumerEmail", subscription.getConsumerEmail());
+                
+                // Verificar se a subscrição é para esta API
+                if (!subscription.getApi().getId().equals(api.getId())) {
+                    log.error("API Key não autorizada para esta API");
+                    return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":\"Forbidden\",\"message\":\"API Key não autorizada para esta API.\"}");
+                }
+            } catch (Exception e) {
+                log.error("API Key inválida: {}", apiKey);
+                return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"error\":\"Unauthorized\",\"message\":\"API Key inválida ou inativa.\"}");
+            }
+        } else {
+            // Para teste do provider, adicionar informações ao request
+            request.setAttribute("isProviderTest", "true");
+            request.setAttribute("consumerId", consumerId);
+            request.setAttribute("consumerEmail", consumerEmail);
         }
         
         // 5. Verificar se API está ativa
