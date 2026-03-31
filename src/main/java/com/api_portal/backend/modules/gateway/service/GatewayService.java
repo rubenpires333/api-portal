@@ -14,6 +14,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -97,6 +98,17 @@ public class GatewayService {
                         .contentType(MediaType.APPLICATION_JSON)
                         .body("{\"error\":\"Forbidden\",\"message\":\"API Key não autorizada para esta API.\"}");
                 }
+                
+                // Verificar limite de requisições
+                if (subscription.getRequestsLimit() != null && subscription.getRequestsUsed() != null) {
+                    if (subscription.getRequestsUsed() >= subscription.getRequestsLimit()) {
+                        log.error("Limite de requisições excedido para subscription: {}", subscription.getId());
+                        return ResponseEntity
+                            .status(HttpStatus.TOO_MANY_REQUESTS)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body("{\"error\":\"Too Many Requests\",\"message\":\"Limite de requisições excedido para esta subscrição.\"}");
+                    }
+                }
             } catch (IllegalArgumentException e) {
                 log.error("API Key inválida: {} - Motivo: {}", apiKey, e.getMessage());
                 return ResponseEntity
@@ -168,6 +180,18 @@ public class GatewayService {
             log.info("Gateway response: {} from {}", response.getStatusCode(), targetUrl);
             String responseBody = response.getBody();
             log.info("Response body length: {}", responseBody != null ? responseBody.length() : 0);
+            
+            // Incrementar contador de requisições se não for teste do provider
+            if (!isProviderTest && request.getAttribute("subscriptionId") != null) {
+                String subscriptionId = (String) request.getAttribute("subscriptionId");
+                try {
+                    subscriptionService.incrementRequestCount(UUID.fromString(subscriptionId));
+                    log.debug("Request count incremented for subscription: {}", subscriptionId);
+                } catch (Exception e) {
+                    log.error("Error incrementing request count for subscription {}: {}", subscriptionId, e.getMessage());
+                    // Não falhar a requisição por causa disso
+                }
+            }
             
             // Validar tamanho da resposta (limite: 5MB)
             final int MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB

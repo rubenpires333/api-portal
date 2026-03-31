@@ -86,6 +86,9 @@ public class SubscriptionService {
             .apiKey(generateApiKey())
             .approvedAt(LocalDateTime.now())
             .notes(request.getNotes())
+            .requestsUsed(0)
+            .requestsLimit(api.getRateLimit() != null ? api.getRateLimit() : 1000) // Usar rate limit da API ou padrão 1000
+            .lastResetAt(LocalDateTime.now()) // Inicializar com data atual
             .build();
         
         subscription = subscriptionRepository.save(subscription);
@@ -270,6 +273,22 @@ public class SubscriptionService {
     }
     
     /**
+     * Incrementar contador de requisições (usado pelo gateway)
+     */
+    @Transactional
+    public void incrementRequestCount(UUID subscriptionId) {
+        Subscription subscription = subscriptionRepository.findById(subscriptionId)
+            .orElseThrow(() -> new IllegalArgumentException("Subscrição não encontrada"));
+        
+        int currentCount = subscription.getRequestsUsed() != null ? subscription.getRequestsUsed() : 0;
+        subscription.setRequestsUsed(currentCount + 1);
+        subscriptionRepository.save(subscription);
+        
+        log.debug("Request count incremented for subscription {}: {} -> {}", 
+            subscriptionId, currentCount, currentCount + 1);
+    }
+    
+    /**
      * Gerar API Key única
      */
     private String generateApiKey() {
@@ -304,6 +323,8 @@ public class SubscriptionService {
             .apiKey(subscription.getApiKey())
             .requestsUsed(subscription.getRequestsUsed() != null ? subscription.getRequestsUsed() : 0)
             .requestsLimit(subscription.getRequestsLimit())
+            .rateLimitPeriod(subscription.getApi().getRateLimitPeriod())
+            .lastResetAt(subscription.getLastResetAt())
             .startDate(subscription.getCreatedAt())
             .endDate(subscription.getExpiresAt())
             .expiresAt(subscription.getExpiresAt())

@@ -28,6 +28,8 @@ public class SubscriptionResponse {
     private String apiKey;
     private Integer requestsUsed;
     private Integer requestsLimit;
+    private String rateLimitPeriod;
+    private LocalDateTime lastResetAt;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private LocalDateTime expiresAt;

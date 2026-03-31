@@ -60,6 +60,9 @@ public class Subscription {
     @Column(name = "requests_limit")
     private Integer requestsLimit;
     
+    @Column(name = "last_reset_at")
+    private LocalDateTime lastResetAt;
+    
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
     
