@@ -27,6 +27,7 @@ public class ApiEndpoint extends Auditable {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "version_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonBackReference
     private ApiVersion version;
     
     @Column(nullable = false)

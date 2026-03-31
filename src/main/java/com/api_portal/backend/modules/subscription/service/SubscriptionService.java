@@ -157,7 +157,6 @@ public class SubscriptionService {
      * Cancelar subscrição (consumer)
      */
     @Transactional
-    @CacheEvict(value = "apiKeys", key = "#result.apiKey")
     public SubscriptionResponse cancelSubscription(UUID id, Authentication authentication) {
         Jwt jwt = (Jwt) authentication.getPrincipal();
         String consumerId = jwt.getSubject();
@@ -234,7 +233,6 @@ public class SubscriptionService {
      * Revogar subscrição (provider)
      */
     @Transactional
-    @CacheEvict(value = "apiKeys", key = "#result.apiKey")
     public SubscriptionResponse revokeSubscription(
             UUID id, 
             RevokeRequest request,
@@ -266,7 +264,6 @@ public class SubscriptionService {
     /**
      * Validar API Key (usado pelo gateway)
      */
-    @Cacheable(value = "apiKeys", key = "#apiKey")
     public Subscription validateApiKey(String apiKey) {
         return subscriptionRepository.findActiveByApiKey(apiKey)
             .orElseThrow(() -> new IllegalArgumentException("API Key inválida ou inativa"));

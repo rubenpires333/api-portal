@@ -77,8 +77,9 @@ public class GatewayService {
         if (!isProviderTest) {
             Subscription subscription;
             try {
+                log.info("Validando API Key de subscription: {}", apiKey);
                 subscription = subscriptionService.validateApiKey(apiKey);
-                log.info("API Key válida para consumer: {}", subscription.getConsumerEmail());
+                log.info("API Key válida para consumer: {} (Status: {})", subscription.getConsumerEmail(), subscription.getStatus());
                 
                 consumerId = subscription.getConsumerId();
                 consumerEmail = subscription.getConsumerEmail();
@@ -96,8 +97,14 @@ public class GatewayService {
                         .contentType(MediaType.APPLICATION_JSON)
                         .body("{\"error\":\"Forbidden\",\"message\":\"API Key não autorizada para esta API.\"}");
                 }
+            } catch (IllegalArgumentException e) {
+                log.error("API Key inválida: {} - Motivo: {}", apiKey, e.getMessage());
+                return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"error\":\"Unauthorized\",\"message\":\"" + e.getMessage() + "\"}");
             } catch (Exception e) {
-                log.error("API Key inválida: {}", apiKey);
+                log.error("Erro inesperado ao validar API Key: {}", apiKey, e);
                 return ResponseEntity
                     .status(HttpStatus.UNAUTHORIZED)
                     .contentType(MediaType.APPLICATION_JSON)

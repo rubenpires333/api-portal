@@ -31,6 +31,7 @@ public class Subscription {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "api_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"versions", "category", "tags"})
     private Api api;
     
     @Column(name = "api_version_id")

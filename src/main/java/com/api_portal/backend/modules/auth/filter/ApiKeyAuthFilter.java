@@ -37,7 +37,8 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             path.startsWith("/api-docs") || 
             path.startsWith("/v3/api-docs") ||
             path.startsWith("/swagger-resources") ||
-            path.startsWith("/webjars")) {
+            path.startsWith("/webjars") ||
+            path.startsWith("/gateway/")) {  // Ignorar gateway - tem sua própria validação
             filterChain.doFilter(request, response);
             return;
         }

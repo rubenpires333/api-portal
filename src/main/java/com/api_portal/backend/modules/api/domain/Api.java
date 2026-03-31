@@ -100,6 +100,7 @@ public class Api extends Auditable {
     
     @OneToMany(mappedBy = "api", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
+    @com.fasterxml.jackson.annotation.JsonManagedReference
     private List<ApiVersion> versions = new ArrayList<>();
     
     private LocalDateTime publishedAt;

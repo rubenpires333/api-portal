@@ -29,6 +29,7 @@ public class ApiVersion extends Auditable {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "api_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonBackReference
     private Api api;
     
     @Column(nullable = false)
@@ -61,5 +62,6 @@ public class ApiVersion extends Auditable {
     
     @OneToMany(mappedBy = "version", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
+    @com.fasterxml.jackson.annotation.JsonManagedReference
     private List<ApiEndpoint> endpoints = new ArrayList<>();
 }
