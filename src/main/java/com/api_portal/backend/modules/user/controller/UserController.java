@@ -65,6 +65,129 @@ public class UserController {
         return ResponseEntity.ok(updated);
     }
     
+    @PutMapping("/me/profile")
+    @Operation(summary = "Atualizar perfil completo do usuário autenticado")
+    public ResponseEntity<UserResponse> updateProfile(
+            @Valid @RequestBody com.api_portal.backend.modules.user.dto.UpdateProfileRequest request,
+            Authentication authentication) {
+        
+        String keycloakId = keycloakSyncService.extractKeycloakId(authentication);
+        UserResponse currentUser = userService.getUserByKeycloakId(keycloakId);
+        
+        UserResponse updated = userService.updateProfile(currentUser.getId(), request);
+        return ResponseEntity.ok(updated);
+    }
+    
+    @GetMapping("/me/addresses")
+    @Operation(summary = "Listar endereços do usuário autenticado")
+    public ResponseEntity<List<com.api_portal.backend.modules.user.dto.AddressResponse>> getMyAddresses(
+            Authentication authentication) {
+        
+        String keycloakId = keycloakSyncService.extractKeycloakId(authentication);
+        UserResponse currentUser = userService.getUserByKeycloakId(keycloakId);
+        
+        List<com.api_portal.backend.modules.user.dto.AddressResponse> addresses = 
+            userService.getUserAddresses(currentUser.getId());
+        return ResponseEntity.ok(addresses);
+    }
+    
+    @PostMapping("/me/addresses")
+    @Operation(summary = "Adicionar endereço ao usuário autenticado")
+    public ResponseEntity<com.api_portal.backend.modules.user.dto.AddressResponse> addAddress(
+            @Valid @RequestBody com.api_portal.backend.modules.user.dto.AddressRequest request,
+            Authentication authentication) {
+        
+        String keycloakId = keycloakSyncService.extractKeycloakId(authentication);
+        UserResponse currentUser = userService.getUserByKeycloakId(keycloakId);
+        
+        com.api_portal.backend.modules.user.dto.AddressResponse address = 
+            userService.addAddress(currentUser.getId(), request);
+        return ResponseEntity.ok(address);
+    }
+    
+    @PutMapping("/me/addresses/{addressId}")
+    @Operation(summary = "Atualizar endereço do usuário autenticado")
+    public ResponseEntity<com.api_portal.backend.modules.user.dto.AddressResponse> updateAddress(
+            @PathVariable UUID addressId,
+            @Valid @RequestBody com.api_portal.backend.modules.user.dto.AddressRequest request,
+            Authentication authentication) {
+        
+        String keycloakId = keycloakSyncService.extractKeycloakId(authentication);
+        UserResponse currentUser = userService.getUserByKeycloakId(keycloakId);
+        
+        com.api_portal.backend.modules.user.dto.AddressResponse address = 
+            userService.updateAddress(currentUser.getId(), addressId, request);
+        return ResponseEntity.ok(address);
+    }
+    
+    @DeleteMapping("/me/addresses/{addressId}")
+    @Operation(summary = "Remover endereço do usuário autenticado")
+    public ResponseEntity<Void> deleteAddress(
+            @PathVariable UUID addressId,
+            Authentication authentication) {
+        
+        String keycloakId = keycloakSyncService.extractKeycloakId(authentication);
+        UserResponse currentUser = userService.getUserByKeycloakId(keycloakId);
+        
+        userService.deleteAddress(currentUser.getId(), addressId);
+        return ResponseEntity.noContent().build();
+    }
+    
+    @GetMapping("/me/contacts")
+    @Operation(summary = "Listar contatos do usuário autenticado")
+    public ResponseEntity<List<com.api_portal.backend.modules.user.dto.ContactResponse>> getMyContacts(
+            Authentication authentication) {
+        
+        String keycloakId = keycloakSyncService.extractKeycloakId(authentication);
+        UserResponse currentUser = userService.getUserByKeycloakId(keycloakId);
+        
+        List<com.api_portal.backend.modules.user.dto.ContactResponse> contacts = 
+            userService.getUserContacts(currentUser.getId());
+        return ResponseEntity.ok(contacts);
+    }
+    
+    @PostMapping("/me/contacts")
+    @Operation(summary = "Adicionar contato ao usuário autenticado")
+    public ResponseEntity<com.api_portal.backend.modules.user.dto.ContactResponse> addContact(
+            @Valid @RequestBody com.api_portal.backend.modules.user.dto.ContactRequest request,
+            Authentication authentication) {
+        
+        String keycloakId = keycloakSyncService.extractKeycloakId(authentication);
+        UserResponse currentUser = userService.getUserByKeycloakId(keycloakId);
+        
+        com.api_portal.backend.modules.user.dto.ContactResponse contact = 
+            userService.addContact(currentUser.getId(), request);
+        return ResponseEntity.ok(contact);
+    }
+    
+    @PutMapping("/me/contacts/{contactId}")
+    @Operation(summary = "Atualizar contato do usuário autenticado")
+    public ResponseEntity<com.api_portal.backend.modules.user.dto.ContactResponse> updateContact(
+            @PathVariable UUID contactId,
+            @Valid @RequestBody com.api_portal.backend.modules.user.dto.ContactRequest request,
+            Authentication authentication) {
+        
+        String keycloakId = keycloakSyncService.extractKeycloakId(authentication);
+        UserResponse currentUser = userService.getUserByKeycloakId(keycloakId);
+        
+        com.api_portal.backend.modules.user.dto.ContactResponse contact = 
+            userService.updateContact(currentUser.getId(), contactId, request);
+        return ResponseEntity.ok(contact);
+    }
+    
+    @DeleteMapping("/me/contacts/{contactId}")
+    @Operation(summary = "Remover contato do usuário autenticado")
+    public ResponseEntity<Void> deleteContact(
+            @PathVariable UUID contactId,
+            Authentication authentication) {
+        
+        String keycloakId = keycloakSyncService.extractKeycloakId(authentication);
+        UserResponse currentUser = userService.getUserByKeycloakId(keycloakId);
+        
+        userService.deleteContact(currentUser.getId(), contactId);
+        return ResponseEntity.noContent().build();
+    }
+    
     @GetMapping
     @RequiresPermission("user.read")
     @Operation(summary = "Listar todos os usuários")

@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.UUID;
@@ -33,6 +34,10 @@ public class UserResponse {
     private String company;
     private String location;
     private String website;
+    private String nif;
+    private String documentType;
+    private LocalDate birthDate;
+    private String gender;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String createdBy;

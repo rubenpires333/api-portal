@@ -82,6 +82,26 @@ public class User extends Auditable {
     @Column
     private String website;
     
+    @Column(length = 20)
+    private String nif;
+    
+    @Column(length = 50)
+    private String documentType;
+    
+    @Column
+    private java.time.LocalDate birthDate;
+    
+    @Column(length = 20)
+    private String gender;
+    
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<Address> addresses = new HashSet<>();
+    
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<Contact> contacts = new HashSet<>();
+    
     @Transient
     public String getFullName() {
         return firstName + " " + lastName;
