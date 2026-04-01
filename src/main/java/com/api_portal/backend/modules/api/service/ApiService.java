@@ -32,6 +32,7 @@ public class ApiService {
     private final ApiRepository apiRepository;
     private final ApiCategoryRepository categoryRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final com.api_portal.backend.modules.user.repository.UserRepository userRepository;
     
     @Transactional
     public ApiResponse createApi(ApiRequest request, String providerId, String providerName, String providerEmail) {
@@ -286,11 +287,7 @@ public class ApiService {
                 .build() : null)
             .status(api.getStatus())
             .visibility(api.getVisibility())
-            .provider(ApiResponse.ProviderInfo.builder()
-                .id(api.getProviderId())
-                .name(api.getProviderName())
-                .email(api.getProviderEmail())
-                .build())
+            .provider(buildProviderInfoForResponse(api.getProviderId(), api.getProviderName(), api.getProviderEmail()))
             .baseUrl(api.getBaseUrl())
             .documentationUrl(api.getDocumentationUrl())
             .termsOfServiceUrl(api.getTermsOfServiceUrl())
@@ -415,11 +412,7 @@ public class ApiService {
                 .slug(api.getCategory().getSlug())
                 .build() : null)
             .visibility(api.getVisibility())
-            .provider(ApiPublicResponse.ProviderInfo.builder()
-                .id(api.getProviderId())
-                .name(api.getProviderName())
-                .email(api.getProviderEmail())
-                .build())
+            .provider(buildProviderInfoForPublicResponse(api.getProviderId(), api.getProviderName(), api.getProviderEmail()))
             .tags(api.getTags())
             .baseUrl(api.getBaseUrl())
             .documentationUrl(api.getDocumentationUrl())
@@ -453,5 +446,47 @@ public class ApiService {
             .replaceAll("\\s+", "-")
             .replaceAll("-+", "-")
             .trim();
+    }
+    
+    private ApiResponse.ProviderInfo buildProviderInfoForResponse(String keycloakId, String name, String email) {
+        var userOpt = userRepository.findByKeycloakId(keycloakId);
+        if (userOpt.isPresent()) {
+            var user = userOpt.get();
+            return ApiResponse.ProviderInfo.builder()
+                .id(user.getId().toString())
+                .name(name)
+                .email(email)
+                .bio(user.getBio())
+                .company(user.getCompany())
+                .website(user.getWebsite())
+                .avatarUrl(user.getAvatarUrl())
+                .build();
+        }
+        return ApiResponse.ProviderInfo.builder()
+            .id(keycloakId)
+            .name(name)
+            .email(email)
+            .build();
+    }
+    
+    private ApiPublicResponse.ProviderInfo buildProviderInfoForPublicResponse(String keycloakId, String name, String email) {
+        var userOpt = userRepository.findByKeycloakId(keycloakId);
+        if (userOpt.isPresent()) {
+            var user = userOpt.get();
+            return ApiPublicResponse.ProviderInfo.builder()
+                .id(user.getId().toString())
+                .name(name)
+                .email(email)
+                .bio(user.getBio())
+                .company(user.getCompany())
+                .website(user.getWebsite())
+                .avatarUrl(user.getAvatarUrl())
+                .build();
+        }
+        return ApiPublicResponse.ProviderInfo.builder()
+            .id(keycloakId)
+            .name(name)
+            .email(email)
+            .build();
     }
 }

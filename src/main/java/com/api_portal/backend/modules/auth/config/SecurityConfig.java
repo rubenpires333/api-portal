@@ -68,7 +68,8 @@ public class SecurityConfig {
                     "/actuator/**",
                     "/error",
                     "/gateway/api/**",
-                    "/api/v1/gateway/test"
+                    "/api/v1/gateway/test",
+                    "/uploads/**"
                 ).permitAll()
                 // Endpoints públicos de leitura (GET)
                 .requestMatchers(
@@ -76,7 +77,13 @@ public class SecurityConfig {
                     "/api/v1/categories",
                     "/api/v1/categories/**",
                     "/api/v1/apis",
-                    "/api/v1/apis/**"
+                    "/api/v1/apis/**",
+                    "/api/v1/users/*/addresses"
+                ).permitAll()
+                // Permitir visualização de perfis de usuários (sem dados sensíveis)
+                .requestMatchers(
+                    org.springframework.http.HttpMethod.GET,
+                    "/api/v1/users/*"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

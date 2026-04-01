@@ -60,6 +60,10 @@ public class ApiPublicResponse {
         private String id;
         private String name;
         private String email;
+        private String bio;
+        private String company;
+        private String website;
+        private String avatarUrl;
     }
     
     @Data

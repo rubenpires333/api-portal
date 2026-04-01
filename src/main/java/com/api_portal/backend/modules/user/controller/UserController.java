@@ -8,6 +8,7 @@ import com.api_portal.backend.modules.user.repository.RoleRepository;
 import com.api_portal.backend.modules.user.repository.UserRepository;
 import com.api_portal.backend.modules.user.service.KeycloakSyncService;
 import com.api_portal.backend.modules.user.service.UserService;
+import com.api_portal.backend.modules.user.service.FileStorageService;
 import com.api_portal.backend.shared.security.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -15,11 +16,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -27,6 +31,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Users", description = "Gerenciamento de usuários")
 @SecurityRequirement(name = "bearer-jwt")
 public class UserController {
@@ -35,6 +40,7 @@ public class UserController {
     private final KeycloakSyncService keycloakSyncService;
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
+    private final FileStorageService fileStorageService;
     
     @GetMapping("/me")
     @Operation(summary = "Obter dados do usuário autenticado")
@@ -133,6 +139,16 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
     
+    @GetMapping("/{userId}/addresses")
+    @Operation(summary = "Listar endereços de um usuário específico")
+    public ResponseEntity<List<com.api_portal.backend.modules.user.dto.AddressResponse>> getUserAddresses(
+            @PathVariable UUID userId) {
+        
+        List<com.api_portal.backend.modules.user.dto.AddressResponse> addresses = 
+            userService.getUserAddresses(userId);
+        return ResponseEntity.ok(addresses);
+    }
+    
     @GetMapping("/me/contacts")
     @Operation(summary = "Listar contatos do usuário autenticado")
     public ResponseEntity<List<com.api_portal.backend.modules.user.dto.ContactResponse>> getMyContacts(
@@ -188,6 +204,64 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
     
+    @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload de avatar do usuário autenticado")
+    public ResponseEntity<Map<String, String>> uploadAvatar(
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+        
+        try {
+            String keycloakId = keycloakSyncService.extractKeycloakId(authentication);
+            UserResponse currentUser = userService.getUserByKeycloakId(keycloakId);
+            
+            // Upload do arquivo
+            String avatarUrl = fileStorageService.uploadAvatar(file, currentUser.getId());
+            
+            // Atualizar usuário com nova URL
+            UpdateUserRequest updateRequest = new UpdateUserRequest();
+            updateRequest.setAvatarUrl(avatarUrl);
+            userService.updateUser(currentUser.getId(), updateRequest);
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("avatarUrl", avatarUrl);
+            response.put("message", "Avatar atualizado com sucesso");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (IllegalArgumentException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        } catch (Exception e) {
+            log.error("Erro ao fazer upload de avatar: {}", e.getMessage());
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Erro ao fazer upload do avatar");
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+    
+    @DeleteMapping("/me/avatar")
+    @Operation(summary = "Remover avatar do usuário autenticado")
+    public ResponseEntity<Void> deleteAvatar(Authentication authentication) {
+        String keycloakId = keycloakSyncService.extractKeycloakId(authentication);
+        UserResponse currentUser = userService.getUserByKeycloakId(keycloakId);
+        
+        // Obter usuário completo
+        User user = userRepository.findById(currentUser.getId())
+            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        
+        // Deletar arquivo físico
+        if (user.getAvatarUrl() != null) {
+            fileStorageService.deleteAvatar(user.getAvatarUrl());
+        }
+        
+        // Remover URL do banco
+        user.setAvatarUrl(null);
+        userRepository.save(user);
+        
+        return ResponseEntity.noContent().build();
+    }
+    
     @GetMapping
     @RequiresPermission("user.read")
     @Operation(summary = "Listar todos os usuários")
@@ -208,8 +282,7 @@ public class UserController {
     }
     
     @GetMapping("/{id}")
-    @RequiresPermission("user.read")
-    @Operation(summary = "Obter usuário por ID")
+    @Operation(summary = "Obter perfil público de um usuário")
     public ResponseEntity<UserResponse> getUserById(@PathVariable UUID id) {
         UserResponse user = userService.getUserById(id);
         return ResponseEntity.ok(user);
