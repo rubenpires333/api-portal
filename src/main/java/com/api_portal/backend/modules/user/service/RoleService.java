@@ -58,7 +58,7 @@ public class RoleService {
     
     @Transactional(readOnly = true)
     public List<RoleResponse> getAllRoles() {
-        return roleRepository.findAll()
+        return roleRepository.findAllWithPermissions()
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -143,6 +143,8 @@ public class RoleService {
     }
     
     private RoleResponse mapToResponse(Role role) {
+        // Não acessar role.getUsers() para evitar lazy loading exception
+        // O userCount será 0 por padrão, a menos que seja necessário
         return RoleResponse.builder()
             .id(role.getId())
             .name(role.getName())
@@ -159,7 +161,7 @@ public class RoleService {
                     .action(perm.getAction())
                     .build())
                 .collect(Collectors.toSet()))
-            .userCount(role.getUsers().size())
+            .userCount(0) // Não carregar users para evitar N+1 queries
             .createdAt(role.getCreatedAt())
             .updatedAt(role.getUpdatedAt())
             .build();

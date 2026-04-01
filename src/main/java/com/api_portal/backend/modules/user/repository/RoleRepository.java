@@ -25,4 +25,7 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
     
     @Query("SELECT r FROM Role r WHERE r.isSystem = false ORDER BY r.name")
     List<Role> findAllCustomRoles();
+    
+    @Query("SELECT DISTINCT r FROM Role r LEFT JOIN FETCH r.permissions ORDER BY r.name")
+    List<Role> findAllWithPermissions();
 }
