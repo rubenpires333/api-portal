@@ -2,6 +2,7 @@ package com.api_portal.backend.modules.auth.controller;
 
 import com.api_portal.backend.modules.auth.dto.*;
 import com.api_portal.backend.modules.auth.service.AuthService;
+import com.api_portal.backend.modules.auth.service.LoginAttemptService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class AuthController {
     
     private final AuthService authService;
+    private final LoginAttemptService loginAttemptService;
     
     @PostMapping("/login")
     @Operation(
@@ -136,6 +138,43 @@ public class AuthController {
     @Operation(summary = "Health check", description = "Verifica se o módulo de autenticação está ativo")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("Auth module is running");
+    }
+    
+    @GetMapping("/captcha-required")
+    @Operation(
+        summary = "Verificar se CAPTCHA é necessário",
+        description = "Verifica se o usuário precisa resolver um CAPTCHA para fazer login"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Verificação realizada com sucesso"),
+        @ApiResponse(responseCode = "400", description = "Parâmetros inválidos")
+    })
+    public ResponseEntity<CaptchaRequirementResponse> checkCaptchaRequirement(
+            @RequestParam String email,
+            HttpServletRequest httpRequest) {
+        
+        String ipAddress = httpRequest.getRemoteAddr();
+        boolean requiresCaptcha = loginAttemptService.requiresCaptcha(email, ipAddress);
+        boolean isBlocked = loginAttemptService.isBlocked(email, ipAddress);
+        long blockedMinutes = loginAttemptService.getBlockedMinutesRemaining(email, ipAddress);
+        
+        String message;
+        if (isBlocked) {
+            message = String.format("Conta bloqueada. Tente novamente em %d minutos.", blockedMinutes);
+        } else if (requiresCaptcha) {
+            message = "CAPTCHA necessário após múltiplas tentativas falhadas";
+        } else {
+            message = "Login normal permitido";
+        }
+        
+        CaptchaRequirementResponse response = CaptchaRequirementResponse.builder()
+            .requiresCaptcha(requiresCaptcha)
+            .isBlocked(isBlocked)
+            .blockedMinutesRemaining(blockedMinutes)
+            .message(message)
+            .build();
+        
+        return ResponseEntity.ok(response);
     }
     
     @PostMapping("/logout")

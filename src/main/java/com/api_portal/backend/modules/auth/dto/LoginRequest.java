@@ -17,4 +17,7 @@ public class LoginRequest {
     @NotBlank(message = "Password é obrigatória")
     @Schema(description = "Password do utilizador", example = "Admin@123")
     private String password;
+    
+    @Schema(description = "Token do Google reCAPTCHA (obrigatório após 3 tentativas falhadas)", example = "03AGdBq...")
+    private String captchaToken;
 }

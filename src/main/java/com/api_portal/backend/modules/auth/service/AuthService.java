@@ -27,6 +27,8 @@ public class AuthService {
     private final KeycloakAdminService keycloakAdminService;
     private final JwtDecoder jwtDecoder;
     private final UserService userService;
+    private final LoginAttemptService loginAttemptService;
+    private final RecaptchaService recaptchaService;
     
     @Value("${keycloak.url}")
     private String keycloakUrl;
@@ -42,6 +44,27 @@ public class AuthService {
     
     public TokenResponse login(LoginRequest request, String ipAddress) {
         try {
+            // Verificar se está bloqueado
+            if (loginAttemptService.isBlocked(request.getEmail(), ipAddress)) {
+                long minutesRemaining = loginAttemptService.getBlockedMinutesRemaining(request.getEmail(), ipAddress);
+                throw new AuthException(
+                    String.format("Conta temporariamente bloqueada. Tente novamente em %d minutos.", minutesRemaining)
+                );
+            }
+            
+            // Verificar se precisa de CAPTCHA
+            if (loginAttemptService.requiresCaptcha(request.getEmail(), ipAddress)) {
+                if (request.getCaptchaToken() == null || request.getCaptchaToken().isEmpty()) {
+                    throw new AuthException("CAPTCHA é obrigatório após múltiplas tentativas falhadas");
+                }
+                
+                // Validar CAPTCHA
+                if (!recaptchaService.validateCaptcha(request.getCaptchaToken())) {
+                    loginAttemptService.recordFailedAttempt(request.getEmail(), ipAddress);
+                    throw new AuthException("CAPTCHA inválido. Tente novamente.");
+                }
+            }
+            
             String tokenUrl = String.format("%s/realms/%s/protocol/openid-connect/token", 
                 keycloakUrl, realm);
             
@@ -75,6 +98,9 @@ public class AuthService {
                 // Sincronizar e validar usuário (lança exceção se inativo)
                 syncUserFromJwt(jwt, ipAddress);
                 
+                // Login bem-sucedido - resetar tentativas
+                loginAttemptService.resetAttempts(request.getEmail(), ipAddress);
+                
                 // Extrair informações do usuário do JWT
                 userInfo = TokenResponse.UserInfo.builder()
                     .id(jwt.getSubject())
@@ -98,10 +124,15 @@ public class AuthService {
             throw new AuthException("Falha ao autenticar com Keycloak");
             
         } catch (AuthException e) {
-            // Propagar AuthException sem modificar a mensagem
+            // Registrar tentativa falhada (exceto se já estiver bloqueado ou erro de CAPTCHA)
+            if (!e.getMessage().contains("bloqueada") && !e.getMessage().contains("CAPTCHA")) {
+                loginAttemptService.recordFailedAttempt(request.getEmail(), ipAddress);
+            }
             throw e;
         } catch (Exception e) {
             log.error("Erro ao fazer login: {}", e.getMessage());
+            // Registrar tentativa falhada
+            loginAttemptService.recordFailedAttempt(request.getEmail(), ipAddress);
             throw new AuthException("Credenciais inválidas", e);
         }
     }
