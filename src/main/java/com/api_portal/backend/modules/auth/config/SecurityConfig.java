@@ -78,7 +78,8 @@ public class SecurityConfig {
                     "/api/v1/categories/**",
                     "/api/v1/apis",
                     "/api/v1/apis/**",
-                    "/api/v1/users/*/addresses"
+                    "/api/v1/users/*/addresses",
+                    "/api/v1/settings/terms-and-policies"
                 ).permitAll()
                 // Permitir visualização de perfis de usuários (sem dados sensíveis)
                 .requestMatchers(
