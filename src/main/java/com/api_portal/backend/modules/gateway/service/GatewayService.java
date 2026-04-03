@@ -53,7 +53,7 @@ public class GatewayService {
         
         // 3. Verificar se é uma API Key de teste do provider
         boolean isProviderTest = false;
-        String consumerId = null;
+        UUID consumerId = null;
         String consumerEmail = null;
         
         // API Key de teste do provider tem formato: test_provider_{providerId}_{apiId}
@@ -64,7 +64,7 @@ public class GatewayService {
                 // Verificar se o provider é dono da API
                 if (api.getProviderId().equals(providerId)) {
                     isProviderTest = true;
-                    consumerId = providerId;
+                    consumerId = UUID.fromString(providerId);
                     consumerEmail = api.getProviderEmail();
                     log.info("Provider test mode: {} testando sua própria API", api.getProviderName());
                 } else {
@@ -85,12 +85,12 @@ public class GatewayService {
                 subscription = subscriptionService.validateApiKey(apiKey);
                 log.info("API Key válida para consumer: {} (Status: {})", subscription.getConsumerEmail(), subscription.getStatus());
                 
-                consumerId = subscription.getConsumerId();
+                consumerId = subscription.getConsumerId(); // Já é UUID
                 consumerEmail = subscription.getConsumerEmail();
                 
                 // Adicionar informações da subscrição ao request para audit log
                 request.setAttribute("subscriptionId", subscription.getId().toString());
-                request.setAttribute("consumerId", subscription.getConsumerId());
+                request.setAttribute("consumerId", subscription.getConsumerId().toString());
                 request.setAttribute("consumerEmail", subscription.getConsumerEmail());
                 
                 // Verificar se a subscrição é para esta API
@@ -260,7 +260,7 @@ public class GatewayService {
         return "";
     }
     
-    private void recordMetric(UUID apiId, UUID subscriptionId, String consumerId, String consumerName,
+    private void recordMetric(UUID apiId, UUID subscriptionId, UUID consumerId, String consumerName,
                              String endpoint, String httpMethod, int statusCode, long responseTimeMs,
                              long requestSize, String errorMessage, String userAgent, String ipAddress) {
         try {

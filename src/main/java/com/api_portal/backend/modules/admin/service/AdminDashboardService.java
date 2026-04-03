@@ -129,10 +129,17 @@ public class AdminDashboardService {
         
         double engagementRate = totalUsers > 0 ? (activeUsersLast30Days * 100.0 / totalUsers) : 0.0;
         
+        // Buscar total de chamadas de API dos últimos 30 dias
+        LocalDate thirtyDaysAgoDate = LocalDate.now().minusDays(30);
+        Long totalApiCalls = dailyMetricRepository.getTotalCallsAfter(thirtyDaysAgoDate);
+        if (totalApiCalls == null) {
+            totalApiCalls = 0L;
+        }
+        
         return DashboardStatsResponse.ActivityStats.builder()
             .activeUsersLast30Days(activeUsersLast30Days)
             .engagementRate(engagementRate)
-            .totalApiCalls(0L) // TODO: Implementar quando houver sistema de métricas
+            .totalApiCalls(totalApiCalls)
             .build();
     }
     
@@ -224,7 +231,7 @@ public class AdminDashboardService {
                     .apiId(sub.getApi().getId())
                     .consumerName(sub.getConsumerName())
                     .consumerEmail(sub.getConsumerEmail())
-                    .consumerId(sub.getConsumerId())
+                    .consumerId(sub.getConsumerId().toString())
                     .providerName(sub.getApi().getProviderName())
                     .providerId(sub.getApi().getProviderId())
                     .requestedAt(sub.getCreatedAt())
@@ -304,7 +311,7 @@ public class AdminDashboardService {
             .collect(Collectors.groupingBy(Subscription::getConsumerId))
             .entrySet().stream()
             .map(entry -> {
-                String consumerId = entry.getKey();
+                UUID consumerIdUuid = entry.getKey();
                 List<Subscription> consumerSubs = entry.getValue();
                 
                 long activeSubs = consumerSubs.stream()
@@ -314,7 +321,7 @@ public class AdminDashboardService {
                 Subscription firstSub = consumerSubs.get(0);
                 
                 return TopRankingsResponse.TopConsumer.builder()
-                    .consumerId(consumerId)
+                    .consumerId(consumerIdUuid.toString())
                     .consumerName(firstSub.getConsumerName())
                     .consumerEmail(firstSub.getConsumerEmail())
                     .subscriptionCount((long) consumerSubs.size())

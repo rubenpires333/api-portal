@@ -3,7 +3,7 @@ CREATE TABLE api_metrics (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     api_id UUID NOT NULL REFERENCES apis(id) ON DELETE CASCADE,
     subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
-    consumer_id VARCHAR(255),
+    consumer_id UUID,  -- Alterado de VARCHAR(255) para UUID
     consumer_name VARCHAR(255),
     endpoint VARCHAR(500) NOT NULL,
     http_method VARCHAR(10) NOT NULL,

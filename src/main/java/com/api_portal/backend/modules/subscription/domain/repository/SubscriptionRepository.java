@@ -16,16 +16,16 @@ import java.util.UUID;
 @Repository
 public interface SubscriptionRepository extends JpaRepository<Subscription, UUID> {
     
-    // Consumer queries
-    Page<Subscription> findByConsumerId(String consumerId, Pageable pageable);
+    // Consumer queries - consumerId é UUID na entidade
+    Page<Subscription> findByConsumerId(UUID consumerId, Pageable pageable);
     
-    List<Subscription> findByConsumerId(String consumerId);
+    List<Subscription> findByConsumerId(UUID consumerId);
     
-    Optional<Subscription> findByConsumerIdAndApiId(String consumerId, UUID apiId);
+    Optional<Subscription> findByConsumerIdAndApiId(UUID consumerId, UUID apiId);
     
-    Optional<Subscription> findByConsumerIdAndApiIdAndStatus(String consumerId, UUID apiId, SubscriptionStatus status);
+    Optional<Subscription> findByConsumerIdAndApiIdAndStatus(UUID consumerId, UUID apiId, SubscriptionStatus status);
     
-    boolean existsByConsumerIdAndApiIdAndStatus(String consumerId, UUID apiId, SubscriptionStatus status);
+    boolean existsByConsumerIdAndApiIdAndStatus(UUID consumerId, UUID apiId, SubscriptionStatus status);
     
     // Provider queries
     @Query("SELECT s FROM Subscription s WHERE s.api.providerId = :providerId")
@@ -84,4 +84,9 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     long countByApiIdAndStatus(UUID apiId, SubscriptionStatus status);
     
     List<Subscription> findByStatusAndCreatedAtBefore(SubscriptionStatus status, java.time.LocalDateTime date);
+    
+    // Métodos para consumer metrics - consumerId é UUID na entidade
+    long countByConsumerIdAndStatus(UUID consumerId, SubscriptionStatus status);
+    
+    List<Subscription> findByConsumerIdAndStatus(UUID consumerId, SubscriptionStatus status);
 }

@@ -34,4 +34,15 @@ public interface ApiMetricDailyRepository extends JpaRepository<ApiMetricDaily, 
     
     @Query("SELECT m.apiId, SUM(m.totalCalls) as totalCalls FROM ApiMetricDaily m WHERE m.metricDate >= :after GROUP BY m.apiId ORDER BY totalCalls DESC")
     List<Object[]> findTopApisByTotalCalls(@Param("after") LocalDate after);
+    
+    // Métodos para consumer metrics - busca métricas das APIs que o consumer tem subscription
+    // consumerId é UUID na entidade Subscription
+    @Query("SELECT m FROM ApiMetricDaily m WHERE m.apiId IN " +
+           "(SELECT s.api.id FROM Subscription s WHERE s.consumerId = :consumerId) " +
+           "AND m.metricDate BETWEEN :start AND :end")
+    List<ApiMetricDaily> findByConsumerSubscriptionsAndMetricDateBetween(
+        @Param("consumerId") UUID consumerId, 
+        @Param("start") LocalDate start, 
+        @Param("end") LocalDate end
+    );
 }

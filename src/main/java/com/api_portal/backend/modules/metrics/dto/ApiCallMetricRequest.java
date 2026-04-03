@@ -20,7 +20,7 @@ public class ApiCallMetricRequest {
     
     private UUID subscriptionId;
     
-    private String consumerId;
+    private UUID consumerId;  // Alterado de String para UUID
     
     private String consumerName;
     

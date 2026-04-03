@@ -64,20 +64,22 @@ class SubscriptionServiceTest {
         request.setApiId(apiId);
         request.setNotes("Test subscription");
         
+        UUID testConsumerId = UUID.randomUUID();
+        
         when(authentication.getPrincipal()).thenReturn(jwt);
-        when(jwt.getSubject()).thenReturn("consumer-123");
+        when(jwt.getSubject()).thenReturn(testConsumerId.toString()); // Retorna String do UUID
         when(jwt.getClaimAsString("email")).thenReturn("consumer@test.com");
         when(jwt.getClaimAsString("name")).thenReturn("Test Consumer");
         
         when(apiRepository.findById(apiId)).thenReturn(Optional.of(testApi));
         when(subscriptionRepository.existsByConsumerIdAndApiIdAndStatus(
-            anyString(), any(UUID.class), any(SubscriptionStatus.class)
+            any(UUID.class), any(UUID.class), any(SubscriptionStatus.class)
         )).thenReturn(false);
         
         Subscription savedSubscription = Subscription.builder()
             .id(UUID.randomUUID())
             .api(testApi)
-            .consumerId("consumer-123")
+            .consumerId(testConsumerId) // Usar UUID
             .consumerEmail("consumer@test.com")
             .status(SubscriptionStatus.ACTIVE)
             .apiKey("apk_test123")

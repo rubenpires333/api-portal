@@ -43,7 +43,8 @@ public class SubscriptionService {
     @Transactional
     public SubscriptionResponse subscribe(SubscriptionRequest request, Authentication authentication) {
         Jwt jwt = (Jwt) authentication.getPrincipal();
-        String consumerId = jwt.getSubject();
+        String consumerIdStr = jwt.getSubject();
+        UUID consumerId = UUID.fromString(consumerIdStr); // Converter String para UUID
         String consumerEmail = jwt.getClaimAsString("email");
         String consumerName = jwt.getClaimAsString("name");
         
@@ -133,7 +134,8 @@ public class SubscriptionService {
     @Transactional(readOnly = true)
     public Page<SubscriptionResponse> getMySubscriptions(Authentication authentication, Pageable pageable) {
         Jwt jwt = (Jwt) authentication.getPrincipal();
-        String consumerId = jwt.getSubject();
+        String consumerIdStr = jwt.getSubject();
+        UUID consumerId = UUID.fromString(consumerIdStr);
         
         return subscriptionRepository.findByConsumerId(consumerId, pageable)
             .map(this::mapToResponse);
@@ -145,7 +147,8 @@ public class SubscriptionService {
     @Transactional(readOnly = true)
     public List<SubscriptionResponse> getMySubscriptionsList(Authentication authentication) {
         Jwt jwt = (Jwt) authentication.getPrincipal();
-        String consumerId = jwt.getSubject();
+        String consumerIdStr = jwt.getSubject();
+        UUID consumerId = UUID.fromString(consumerIdStr);
         
         return subscriptionRepository.findByConsumerId(consumerId)
             .stream()
@@ -159,7 +162,8 @@ public class SubscriptionService {
     @Transactional(readOnly = true)
     public SubscriptionResponse getActiveSubscriptionByApiId(UUID apiId, Authentication authentication) {
         Jwt jwt = (Jwt) authentication.getPrincipal();
-        String consumerId = jwt.getSubject();
+        String consumerIdStr = jwt.getSubject();
+        UUID consumerId = UUID.fromString(consumerIdStr);
         
         return subscriptionRepository.findByConsumerIdAndApiIdAndStatus(
                 consumerId, apiId, SubscriptionStatus.ACTIVE)
@@ -173,7 +177,8 @@ public class SubscriptionService {
     @Transactional(readOnly = true)
     public SubscriptionResponse getActiveOrPendingSubscriptionByApiId(UUID apiId, Authentication authentication) {
         Jwt jwt = (Jwt) authentication.getPrincipal();
-        String consumerId = jwt.getSubject();
+        String consumerIdStr = jwt.getSubject();
+        UUID consumerId = UUID.fromString(consumerIdStr);
         
         // Primeiro tenta encontrar ativa
         var activeSubscription = subscriptionRepository.findByConsumerIdAndApiIdAndStatus(
@@ -196,7 +201,8 @@ public class SubscriptionService {
     @Transactional(readOnly = true)
     public SubscriptionResponse getSubscriptionById(UUID id, Authentication authentication) {
         Jwt jwt = (Jwt) authentication.getPrincipal();
-        String consumerId = jwt.getSubject();
+        String consumerIdStr = jwt.getSubject();
+        UUID consumerId = UUID.fromString(consumerIdStr);
         
         Subscription subscription = subscriptionRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Subscrição não encontrada"));
@@ -214,7 +220,8 @@ public class SubscriptionService {
     @Transactional
     public SubscriptionResponse cancelSubscription(UUID id, Authentication authentication) {
         Jwt jwt = (Jwt) authentication.getPrincipal();
-        String consumerId = jwt.getSubject();
+        String consumerIdStr = jwt.getSubject();
+        UUID consumerId = UUID.fromString(consumerIdStr);
         
         Subscription subscription = subscriptionRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Subscrição não encontrada"));
@@ -385,7 +392,7 @@ public class SubscriptionService {
             .apiName(subscription.getApi().getName())
             .apiSlug(subscription.getApi().getSlug())
             .apiVersion(apiVersion)
-            .consumerId(subscription.getConsumerId())
+            .consumerId(subscription.getConsumerId().toString()) // Converter UUID para String
             .consumerEmail(subscription.getConsumerEmail())
             .consumerName(subscription.getConsumerName())
             .status(subscription.getStatus())

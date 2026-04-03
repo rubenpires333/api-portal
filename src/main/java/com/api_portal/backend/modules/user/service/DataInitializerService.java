@@ -117,7 +117,7 @@ public class DataInitializerService implements CommandLineRunner {
         if (!roleRepository.existsByCode("PROVIDER")) {
             Set<Permission> providerPerms = getPermissionsByCode(allPermissions,
                 "api.create", "api.read", "api.update", "api.delete", "api.publish",
-                "category.read", "user.read"
+                "category.read", "user.read", "provider.metrics.read"
             );
             
             Role provider = Role.builder()
@@ -138,7 +138,7 @@ public class DataInitializerService implements CommandLineRunner {
         // CONSUMER
         if (!roleRepository.existsByCode("CONSUMER")) {
             Set<Permission> consumerPerms = getPermissionsByCode(allPermissions,
-                "api.read", "category.read", "user.read"
+                "api.read", "category.read", "user.read", "consumer.metrics.read"
             );
             
             Role consumer = Role.builder()
@@ -287,6 +287,18 @@ public class DataInitializerService implements CommandLineRunner {
         permissions.add(new PermissionData(
             "Deletar Endpoint", "endpoint.delete", 
             "Permite deletar endpoints", "endpoint", "delete"
+        ));
+        
+        // Permissões de Métricas do Provider
+        permissions.add(new PermissionData(
+            "Ler Métricas do Provider", "provider.metrics.read", 
+            "Permite visualizar métricas das APIs do provider", "provider", "metrics.read"
+        ));
+        
+        // Permissões de Métricas do Consumer
+        permissions.add(new PermissionData(
+            "Ler Métricas do Consumer", "consumer.metrics.read", 
+            "Permite visualizar métricas de uso das APIs", "consumer", "metrics.read"
         ));
         
         return permissions;

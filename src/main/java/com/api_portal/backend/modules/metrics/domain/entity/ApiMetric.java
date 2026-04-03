@@ -36,7 +36,7 @@ public class ApiMetric {
     private UUID subscriptionId;
     
     @Column(name = "consumer_id")
-    private String consumerId;
+    private UUID consumerId;  // Alterado de String para UUID
     
     @Column(name = "consumer_name")
     private String consumerName;

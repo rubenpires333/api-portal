@@ -37,8 +37,8 @@ public class Subscription {
     @Column(name = "api_version_id")
     private UUID apiVersionId;
     
-    @Column(name = "consumer_id", nullable = false)
-    private String consumerId; // Keycloak user ID
+    @Column(name = "consumer_id", nullable = false, columnDefinition = "uuid")
+    private UUID consumerId; // Keycloak user ID
     
     @Column(name = "consumer_email", nullable = false)
     private String consumerEmail;

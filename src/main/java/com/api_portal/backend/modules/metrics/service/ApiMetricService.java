@@ -117,7 +117,7 @@ public class ApiMetricService {
         
         int uniqueConsumers = (int) apiMetrics.stream()
             .map(ApiMetric::getConsumerId)
-            .filter(id -> id != null && !id.isEmpty())
+            .filter(id -> id != null)  // UUID não tem isEmpty(), apenas verificar null
             .distinct()
             .count();
         

@@ -15,6 +15,8 @@ public interface ApiMetricRepository extends JpaRepository<ApiMetric, UUID> {
     
     List<ApiMetric> findByApiIdAndCreatedAtBetween(UUID apiId, LocalDateTime start, LocalDateTime end);
     
+    List<ApiMetric> findByConsumerIdAndCreatedAtBetween(UUID consumerId, LocalDateTime start, LocalDateTime end);
+    
     List<ApiMetric> findByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
     
     long countByApiIdAndCreatedAtAfter(UUID apiId, LocalDateTime after);

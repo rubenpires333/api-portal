@@ -321,9 +321,11 @@ public class ApiService {
         final UUID subscribedVersionId;
         
         if (consumerId != null) {
+            UUID consumerUuid = UUID.fromString(consumerId); // Converter String para UUID
+            
             // Primeiro verifica se tem subscrição ACTIVE
             var subscription = subscriptionRepository.findByConsumerIdAndApiIdAndStatus(
-                consumerId, api.getId(), SubscriptionStatus.ACTIVE);
+                consumerUuid, api.getId(), SubscriptionStatus.ACTIVE);
             
             if (subscription.isPresent()) {
                 isSubscribed = true;
@@ -333,7 +335,7 @@ public class ApiService {
             } else {
                 // Se não tem ACTIVE, verifica se tem PENDING
                 var pendingSubscription = subscriptionRepository.findByConsumerIdAndApiIdAndStatus(
-                    consumerId, api.getId(), SubscriptionStatus.PENDING);
+                    consumerUuid, api.getId(), SubscriptionStatus.PENDING);
                 
                 if (pendingSubscription.isPresent()) {
                     isSubscribed = true;

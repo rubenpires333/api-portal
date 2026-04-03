@@ -99,8 +99,9 @@ public class OpenApiGeneratorService {
         
         // Se API não é pública, verificar subscription ativa
         if (!"PUBLIC".equals(api.getVisibility().name())) {
+            UUID consumerUuid = UUID.fromString(consumerId); // Converter String para UUID
             boolean hasActiveSubscription = subscriptionRepository
-                .existsByConsumerIdAndApiIdAndStatus(consumerId, api.getId(), 
+                .existsByConsumerIdAndApiIdAndStatus(consumerUuid, api.getId(), 
                     com.api_portal.backend.modules.subscription.domain.enums.SubscriptionStatus.ACTIVE);
             
             if (!hasActiveSubscription) {

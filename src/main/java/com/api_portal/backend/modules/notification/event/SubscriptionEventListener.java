@@ -64,7 +64,7 @@ public class SubscriptionEventListener {
         String message = "Sua subscription para a API " + subscription.getApi().getName() + " foi aprovada!";
         
         notificationService.sendNotification(
-            subscription.getConsumerId(),
+            subscription.getConsumerId().toString(), // Converter UUID para String
             subscription.getConsumerEmail(),
             NotificationType.SUBSCRIPTION_APPROVED,
             title,
@@ -91,7 +91,7 @@ public class SubscriptionEventListener {
         String message = "Sua subscription para a API " + subscription.getApi().getName() + " foi revogada";
         
         notificationService.sendNotification(
-            subscription.getConsumerId(),
+            subscription.getConsumerId().toString(), // Converter UUID para String
             subscription.getConsumerEmail(),
             NotificationType.SUBSCRIPTION_REVOKED,
             title,
