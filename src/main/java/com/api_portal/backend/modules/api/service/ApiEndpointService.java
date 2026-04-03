@@ -57,8 +57,8 @@ public class ApiEndpointService {
     
     @Transactional(readOnly = true)
     public List<ApiEndpointResponse> getEndpointsByVersionId(UUID versionId) {
-        return endpointRepository.findByVersionId(versionId)
-            .stream()
+        List<ApiEndpoint> endpoints = endpointRepository.findByVersionId(versionId);
+        return endpoints.stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
