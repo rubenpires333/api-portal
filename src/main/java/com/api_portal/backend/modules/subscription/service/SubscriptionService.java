@@ -3,6 +3,9 @@ package com.api_portal.backend.modules.subscription.service;
 import com.api_portal.backend.modules.api.domain.Api;
 import com.api_portal.backend.modules.api.domain.enums.ApiStatus;
 import com.api_portal.backend.modules.api.repository.ApiRepository;
+import com.api_portal.backend.modules.notification.event.SubscriptionApprovedEvent;
+import com.api_portal.backend.modules.notification.event.SubscriptionRequestedEvent;
+import com.api_portal.backend.modules.notification.event.SubscriptionRevokedEvent;
 import com.api_portal.backend.modules.subscription.domain.entity.Subscription;
 import com.api_portal.backend.modules.subscription.domain.enums.SubscriptionStatus;
 import com.api_portal.backend.modules.subscription.domain.repository.SubscriptionRepository;
@@ -13,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -31,6 +35,7 @@ public class SubscriptionService {
     
     private final SubscriptionRepository subscriptionRepository;
     private final ApiRepository apiRepository;
+    private final ApplicationEventPublisher eventPublisher;
     
     /**
      * Consumer subscreve uma API
@@ -108,10 +113,13 @@ public class SubscriptionService {
         
         subscription = subscriptionRepository.save(subscription);
         
+        // Publicar evento de subscription criada
         if (initialStatus == SubscriptionStatus.PENDING) {
+            eventPublisher.publishEvent(new SubscriptionRequestedEvent(this, subscription));
             log.info("Nova subscrição PENDENTE criada: {} para API: {} (requer aprovação)", 
                 subscription.getId(), api.getName());
         } else {
+            eventPublisher.publishEvent(new SubscriptionApprovedEvent(this, subscription));
             log.info("Nova subscrição ATIVA criada: {} para API: {}", 
                 subscription.getId(), api.getName());
         }
@@ -282,6 +290,9 @@ public class SubscriptionService {
         subscription.setApprovedAt(LocalDateTime.now());
         subscription = subscriptionRepository.save(subscription);
         
+        // Publicar evento de aprovação
+        eventPublisher.publishEvent(new SubscriptionApprovedEvent(this, subscription));
+        
         log.info("Subscrição aprovada: {}", id);
         
         return mapToResponse(subscription);
@@ -313,6 +324,9 @@ public class SubscriptionService {
         subscription.setRevokedAt(LocalDateTime.now());
         subscription.setRevokeReason(request.getReason());
         subscription = subscriptionRepository.save(subscription);
+        
+        // Publicar evento de revogação
+        eventPublisher.publishEvent(new SubscriptionRevokedEvent(this, subscription, request.getReason()));
         
         log.info("Subscrição revogada: {} - Motivo: {}", id, request.getReason());
         
