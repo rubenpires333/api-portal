@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -33,7 +34,7 @@ public class ApiDocsController {
             @PathVariable UUID versionId,
             @RequestParam(defaultValue = "json") String format) {
         
-        String spec = generatorService.generateOpenApiSpec(apiId, versionId, format);
+        String spec = generatorService.generateOpenApiSpec(apiId, versionId, format, false);
         
         MediaType mediaType = "yaml".equalsIgnoreCase(format) 
             ? MediaType.valueOf("application/x-yaml")
@@ -57,7 +58,7 @@ public class ApiDocsController {
             @PathVariable UUID apiId,
             @RequestParam(defaultValue = "json") String format) {
         
-        String spec = generatorService.generateOpenApiSpec(apiId, format);
+        String spec = generatorService.generateOpenApiSpec(apiId, format, false);
         
         MediaType mediaType = "yaml".equalsIgnoreCase(format) 
             ? MediaType.valueOf("application/x-yaml")
@@ -70,14 +71,17 @@ public class ApiDocsController {
     
     /**
      * Gera spec OpenAPI pública por slug (sem autenticação)
+     * Para APIs públicas, qualquer um pode acessar
+     * Para APIs privadas/pagas, apenas quem tem subscription ativa
      */
     @GetMapping("/public/docs/{slug}/openapi")
     @Operation(summary = "Gerar OpenAPI spec pública")
     public ResponseEntity<String> generatePublicOpenApi(
             @PathVariable String slug,
-            @RequestParam(defaultValue = "json") String format) {
+            @RequestParam(defaultValue = "json") String format,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
         
-        String spec = generatorService.generateOpenApiSpecBySlug(slug, format);
+        String spec = generatorService.generateOpenApiSpecBySlug(slug, format, authHeader, true);
         
         MediaType mediaType = "yaml".equalsIgnoreCase(format) 
             ? MediaType.valueOf("application/x-yaml")
@@ -86,5 +90,37 @@ public class ApiDocsController {
         return ResponseEntity.ok()
             .contentType(mediaType)
             .body(spec);
+    }
+    
+    /**
+     * Gera spec OpenAPI para consumer autenticado
+     * Verifica se tem subscription ativa
+     */
+    @GetMapping("/api/v1/consumer/docs/{slug}/openapi")
+    @Operation(
+        summary = "Gerar OpenAPI spec para consumer",
+        security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    public ResponseEntity<String> generateConsumerOpenApi(
+            @PathVariable String slug,
+            @RequestParam(defaultValue = "json") String format,
+            Authentication authentication) {
+        
+        String consumerId = getUserId(authentication);
+        String spec = generatorService.generateOpenApiSpecForConsumer(slug, format, consumerId);
+        
+        MediaType mediaType = "yaml".equalsIgnoreCase(format) 
+            ? MediaType.valueOf("application/x-yaml")
+            : MediaType.APPLICATION_JSON;
+        
+        return ResponseEntity.ok()
+            .contentType(mediaType)
+            .body(spec);
+    }
+    
+    private String getUserId(Authentication authentication) {
+        org.springframework.security.oauth2.jwt.Jwt jwt = 
+            (org.springframework.security.oauth2.jwt.Jwt) authentication.getPrincipal();
+        return jwt.getSubject();
     }
 }

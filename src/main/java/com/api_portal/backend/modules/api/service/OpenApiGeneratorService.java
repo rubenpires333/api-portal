@@ -7,6 +7,7 @@ import com.api_portal.backend.modules.api.exception.ApiException;
 import com.api_portal.backend.modules.api.repository.ApiEndpointRepository;
 import com.api_portal.backend.modules.api.repository.ApiRepository;
 import com.api_portal.backend.modules.api.repository.ApiVersionRepository;
+import com.api_portal.backend.modules.subscription.domain.repository.SubscriptionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -25,13 +26,14 @@ public class OpenApiGeneratorService {
     private final ApiRepository apiRepository;
     private final ApiVersionRepository versionRepository;
     private final ApiEndpointRepository endpointRepository;
+    private final SubscriptionRepository subscriptionRepository;
     private final ObjectMapper objectMapper;
     
     /**
      * Gera spec OpenAPI 3.0 para uma versão específica
      */
     @Transactional(readOnly = true)
-    public String generateOpenApiSpec(UUID apiId, UUID versionId, String format) {
+    public String generateOpenApiSpec(UUID apiId, UUID versionId, String format, boolean forConsumer) {
         Api api = apiRepository.findById(apiId)
             .orElseThrow(() -> new ApiException("API não encontrada"));
         
@@ -50,14 +52,14 @@ public class OpenApiGeneratorService {
         // Gerar spec dinamicamente
         List<ApiEndpoint> endpoints = endpointRepository.findByVersionId(versionId);
         
-        return generateSpec(api, version, endpoints, format);
+        return generateSpec(api, version, endpoints, format, forConsumer);
     }
     
     /**
      * Gera spec OpenAPI para versão padrão
      */
     @Transactional(readOnly = true)
-    public String generateOpenApiSpec(UUID apiId, String format) {
+    public String generateOpenApiSpec(UUID apiId, String format, boolean forConsumer) {
         Api api = apiRepository.findById(apiId)
             .orElseThrow(() -> new ApiException("API não encontrada"));
         
@@ -66,24 +68,53 @@ public class OpenApiGeneratorService {
             .findFirst()
             .orElseThrow(() -> new ApiException("Nenhuma versão padrão encontrada"));
         
-        return generateOpenApiSpec(apiId, defaultVersion.getId(), format);
+        return generateOpenApiSpec(apiId, defaultVersion.getId(), format, forConsumer);
     }
     
     /**
      * Gera spec OpenAPI por slug (público)
+     * Apenas para APIs públicas
      */
     @Transactional(readOnly = true)
-    public String generateOpenApiSpecBySlug(String slug, String format) {
+    public String generateOpenApiSpecBySlug(String slug, String format, String authHeader, boolean forConsumer) {
         Api api = apiRepository.findBySlug(slug)
             .orElseThrow(() -> new ApiException("API não encontrada"));
         
-        return generateOpenApiSpec(api.getId(), format);
+        // Se API não é pública e é para consumer, negar acesso
+        if (!"PUBLIC".equals(api.getVisibility().name()) && forConsumer) {
+            throw new ApiException("Esta API requer subscription ativa. Use o endpoint autenticado.");
+        }
+        
+        return generateOpenApiSpec(api.getId(), format, forConsumer);
+    }
+    
+    /**
+     * Gera spec OpenAPI para consumer autenticado
+     * Verifica se tem subscription ativa para APIs privadas/pagas
+     */
+    @Transactional(readOnly = true)
+    public String generateOpenApiSpecForConsumer(String slug, String format, String consumerId) {
+        Api api = apiRepository.findBySlug(slug)
+            .orElseThrow(() -> new ApiException("API não encontrada"));
+        
+        // Se API não é pública, verificar subscription ativa
+        if (!"PUBLIC".equals(api.getVisibility().name())) {
+            boolean hasActiveSubscription = subscriptionRepository
+                .existsByConsumerIdAndApiIdAndStatus(consumerId, api.getId(), 
+                    com.api_portal.backend.modules.subscription.domain.enums.SubscriptionStatus.ACTIVE);
+            
+            if (!hasActiveSubscription) {
+                throw new ApiException("Você precisa ter uma subscription ativa para acessar esta API");
+            }
+        }
+        
+        return generateOpenApiSpec(api.getId(), format, true);
     }
     
     /**
      * Gera a spec OpenAPI completa
      */
-    private String generateSpec(Api api, ApiVersion version, List<ApiEndpoint> endpoints, String format) {
+    private String generateSpec(Api api, ApiVersion version, List<ApiEndpoint> endpoints, String format, boolean forConsumer) {
         try {
             ObjectNode spec = objectMapper.createObjectNode();
             
@@ -107,16 +138,24 @@ public class OpenApiGeneratorService {
             // Servers
             ArrayNode servers = spec.putArray("servers");
             
-            String baseUrl = version.getBaseUrl() != null ? version.getBaseUrl() : api.getBaseUrl();
-            if (baseUrl != null && !baseUrl.isEmpty()) {
-                ObjectNode server1 = servers.addObject();
-                server1.put("url", baseUrl);
-                server1.put("description", "Production server");
+            // Para consumers, mostrar APENAS o gateway
+            if (forConsumer) {
+                ObjectNode gatewayServer = servers.addObject();
+                gatewayServer.put("url", "http://localhost:8080/gateway/api/" + api.getSlug());
+                gatewayServer.put("description", "API Gateway");
+            } else {
+                // Para providers, mostrar URL original E gateway
+                String baseUrl = version.getBaseUrl() != null ? version.getBaseUrl() : api.getBaseUrl();
+                if (baseUrl != null && !baseUrl.isEmpty()) {
+                    ObjectNode server1 = servers.addObject();
+                    server1.put("url", baseUrl);
+                    server1.put("description", "Production server");
+                }
+                
+                ObjectNode gatewayServer = servers.addObject();
+                gatewayServer.put("url", "http://localhost:8080/gateway/api/" + api.getSlug());
+                gatewayServer.put("description", "API Gateway");
             }
-            
-            ObjectNode gatewayServer = servers.addObject();
-            gatewayServer.put("url", "http://localhost:8080/gateway/api/" + api.getSlug());
-            gatewayServer.put("description", "API Gateway");
             
             // Tags
             Set<String> allTags = new HashSet<>();
