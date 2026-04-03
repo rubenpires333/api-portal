@@ -5,6 +5,7 @@ import com.api_portal.backend.modules.admin.dto.PendingSubscriptionResponse;
 import com.api_portal.backend.modules.admin.dto.RecentActivityResponse;
 import com.api_portal.backend.modules.admin.dto.SystemAlertsResponse;
 import com.api_portal.backend.modules.admin.dto.TopRankingsResponse;
+import com.api_portal.backend.modules.admin.dto.UsageMetricsResponse;
 import com.api_portal.backend.modules.api.domain.Api;
 import com.api_portal.backend.modules.api.domain.enums.ApiStatus;
 import com.api_portal.backend.modules.api.repository.ApiRepository;
@@ -18,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -399,6 +401,119 @@ public class AdminDashboardService {
         if (severity == SystemAlertsResponse.AlertSeverity.ERROR) return 3;
         if (severity == SystemAlertsResponse.AlertSeverity.WARNING) return 2;
         return 1; // INFO
+    }
+    
+    @Transactional(readOnly = true)
+    public UsageMetricsResponse getUsageMetrics(int days) {
+        // TODO: Substituir por dados reais quando sistema de métricas for implementado
+        // Por enquanto, gerando dados simulados baseados nas subscriptions existentes
+        
+        List<Api> publishedApis = apiRepository.findByStatus(ApiStatus.PUBLISHED);
+        List<Subscription> activeSubscriptions = subscriptionRepository.findByStatus(SubscriptionStatus.ACTIVE);
+        
+        // Sumário de uso
+        UsageMetricsResponse.UsageSummary summary = generateUsageSummary(publishedApis, activeSubscriptions);
+        
+        // Uso diário (últimos N dias)
+        List<UsageMetricsResponse.DailyUsage> dailyUsage = generateDailyUsage(days);
+        
+        // Top APIs por uso
+        List<UsageMetricsResponse.TopApiUsage> topApis = generateTopApiUsage(publishedApis);
+        
+        // Performance por API
+        Map<String, UsageMetricsResponse.PerformanceMetrics> apiPerformance = generateApiPerformance(publishedApis);
+        
+        return UsageMetricsResponse.builder()
+            .summary(summary)
+            .dailyUsage(dailyUsage)
+            .topApis(topApis)
+            .apiPerformance(apiPerformance)
+            .build();
+    }
+    
+    private UsageMetricsResponse.UsageSummary generateUsageSummary(List<Api> apis, List<Subscription> subscriptions) {
+        long activeApis = apis.size();
+        long totalSubscriptions = subscriptions.size();
+        
+        // Simulando métricas baseadas em subscriptions
+        long estimatedCallsPerDay = totalSubscriptions * 100; // 100 calls por subscription/dia
+        long totalCallsLast30Days = estimatedCallsPerDay * 30;
+        
+        return UsageMetricsResponse.UsageSummary.builder()
+            .totalCalls(totalCallsLast30Days)
+            .totalCallsLast30Days(totalCallsLast30Days)
+            .totalCallsToday(estimatedCallsPerDay)
+            .averageResponseTime(150.0 + (Math.random() * 100)) // 150-250ms
+            .errorRate(0.5 + (Math.random() * 2)) // 0.5-2.5%
+            .activeApis(activeApis)
+            .build();
+    }
+    
+    private List<UsageMetricsResponse.DailyUsage> generateDailyUsage(int days) {
+        List<UsageMetricsResponse.DailyUsage> dailyUsage = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+        
+        for (int i = days - 1; i >= 0; i--) {
+            LocalDate date = today.minusDays(i);
+            long baseCalls = 5000 + (long)(Math.random() * 3000);
+            long errorCalls = (long)(baseCalls * (0.01 + Math.random() * 0.02));
+            
+            dailyUsage.add(UsageMetricsResponse.DailyUsage.builder()
+                .date(date)
+                .totalCalls(baseCalls)
+                .successCalls(baseCalls - errorCalls)
+                .errorCalls(errorCalls)
+                .averageResponseTime(150.0 + (Math.random() * 100))
+                .build());
+        }
+        
+        return dailyUsage;
+    }
+    
+    private List<UsageMetricsResponse.TopApiUsage> generateTopApiUsage(List<Api> apis) {
+        return apis.stream()
+            .limit(10)
+            .map(api -> {
+                long subscriptionCount = subscriptionRepository.countByApiId(api.getId());
+                long estimatedCalls = subscriptionCount * 100 * 30; // 100 calls/dia * 30 dias
+                
+                return UsageMetricsResponse.TopApiUsage.builder()
+                    .apiId(api.getId())
+                    .apiName(api.getName())
+                    .apiSlug(api.getSlug())
+                    .totalCalls(estimatedCalls)
+                    .averageResponseTime(150.0 + (Math.random() * 150))
+                    .errorRate(0.5 + (Math.random() * 2))
+                    .activeSubscriptions(subscriptionCount)
+                    .build();
+            })
+            .sorted((a, b) -> Long.compare(b.getTotalCalls(), a.getTotalCalls()))
+            .limit(10)
+            .collect(Collectors.toList());
+    }
+    
+    private Map<String, UsageMetricsResponse.PerformanceMetrics> generateApiPerformance(List<Api> apis) {
+        return apis.stream()
+            .limit(10)
+            .collect(Collectors.toMap(
+                Api::getSlug,
+                api -> {
+                    double avgResponse = 150.0 + (Math.random() * 150);
+                    long totalReqs = subscriptionRepository.countByApiId(api.getId()) * 3000;
+                    long errorReqs = (long)(totalReqs * (0.01 + Math.random() * 0.02));
+                    
+                    return UsageMetricsResponse.PerformanceMetrics.builder()
+                        .apiName(api.getName())
+                        .averageResponseTime(avgResponse)
+                        .minResponseTime(avgResponse * 0.5)
+                        .maxResponseTime(avgResponse * 2.5)
+                        .errorRate((errorReqs * 100.0) / totalReqs)
+                        .totalRequests(totalReqs)
+                        .successRequests(totalReqs - errorReqs)
+                        .errorRequests(errorReqs)
+                        .build();
+                }
+            ));
     }
 
 }

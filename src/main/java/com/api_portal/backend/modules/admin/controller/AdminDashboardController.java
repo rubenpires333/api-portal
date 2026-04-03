@@ -5,6 +5,7 @@ import com.api_portal.backend.modules.admin.dto.PendingSubscriptionResponse;
 import com.api_portal.backend.modules.admin.dto.RecentActivityResponse;
 import com.api_portal.backend.modules.admin.dto.SystemAlertsResponse;
 import com.api_portal.backend.modules.admin.dto.TopRankingsResponse;
+import com.api_portal.backend.modules.admin.dto.UsageMetricsResponse;
 import com.api_portal.backend.modules.admin.service.AdminDashboardService;
 import com.api_portal.backend.shared.security.RequiresPermission;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,5 +60,13 @@ public class AdminDashboardController {
     @Operation(summary = "Obter alertas do sistema")
     public ResponseEntity<SystemAlertsResponse> getSystemAlerts() {
         return ResponseEntity.ok(dashboardService.getSystemAlerts());
+    }
+    
+    @GetMapping("/usage-metrics")
+    @RequiresPermission("admin.dashboard.view")
+    @Operation(summary = "Obter métricas de uso e performance")
+    public ResponseEntity<UsageMetricsResponse> getUsageMetrics(
+            @RequestParam(defaultValue = "30") int days) {
+        return ResponseEntity.ok(dashboardService.getUsageMetrics(days));
     }
 }
