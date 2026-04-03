@@ -2,13 +2,16 @@ package com.api_portal.backend.modules.notification.service;
 
 import com.api_portal.backend.modules.notification.domain.entity.Notification;
 import com.api_portal.backend.modules.notification.domain.entity.NotificationPreference;
-import com.api_portal.backend.modules.notification.domain.enums.NotificationChannel;
+import com.api_portal.backend.modules.notification.domain.entity.NotificationTemplate;
 import com.api_portal.backend.modules.notification.domain.enums.NotificationType;
 import com.api_portal.backend.modules.notification.domain.repository.NotificationPreferenceRepository;
 import com.api_portal.backend.modules.notification.domain.repository.NotificationRepository;
+import com.api_portal.backend.modules.notification.domain.repository.NotificationTemplateRepository;
 import com.api_portal.backend.modules.notification.dto.NotificationPreferenceRequest;
 import com.api_portal.backend.modules.notification.dto.NotificationPreferenceResponse;
 import com.api_portal.backend.modules.notification.dto.NotificationResponse;
+import com.api_portal.backend.modules.notification.dto.NotificationTemplateRequest;
+import com.api_portal.backend.modules.notification.dto.NotificationTemplateResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -28,6 +31,7 @@ public class NotificationService {
     
     private final NotificationRepository notificationRepository;
     private final NotificationPreferenceRepository preferenceRepository;
+    private final NotificationTemplateRepository templateRepository;
     private final NotificationTemplateService templateService;
     private final EmailNotificationService emailService;
     
@@ -238,6 +242,86 @@ public class NotificationService {
             .notificationType(preference.getNotificationType())
             .inAppEnabled(preference.getInAppEnabled())
             .emailEnabled(preference.getEmailEnabled())
+            .build();
+    }
+    
+    // Template Management Methods
+    
+    /**
+     * Listar todos os templates
+     */
+    @Transactional(readOnly = true)
+    public List<NotificationTemplateResponse> getAllTemplates() {
+        return templateRepository.findAll().stream()
+            .map(this::mapTemplateToResponse)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Obter template por ID
+     */
+    @Transactional(readOnly = true)
+    public NotificationTemplateResponse getTemplateById(UUID id) {
+        NotificationTemplate template = templateRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Template não encontrado"));
+        return mapTemplateToResponse(template);
+    }
+    
+    /**
+     * Criar novo template
+     */
+    @Transactional
+    public NotificationTemplateResponse createTemplate(NotificationTemplateRequest request) {
+        NotificationTemplate template = NotificationTemplate.builder()
+            .type(request.getType())
+            .channel(request.getChannel())
+            .language(request.getLanguage())
+            .subject(request.getSubject())
+            .template(request.getTemplate())
+            .variables(request.getVariables())
+            .build();
+        
+        template = templateRepository.save(template);
+        return mapTemplateToResponse(template);
+    }
+    
+    /**
+     * Atualizar template
+     */
+    @Transactional
+    public NotificationTemplateResponse updateTemplate(UUID id, NotificationTemplateRequest request) {
+        NotificationTemplate template = templateRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Template não encontrado"));
+        
+        template.setSubject(request.getSubject());
+        template.setTemplate(request.getTemplate());
+        template.setVariables(request.getVariables());
+        
+        template = templateRepository.save(template);
+        return mapTemplateToResponse(template);
+    }
+    
+    /**
+     * Deletar template
+     */
+    @Transactional
+    public void deleteTemplate(UUID id) {
+        NotificationTemplate template = templateRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Template não encontrado"));
+        templateRepository.delete(template);
+    }
+    
+    private NotificationTemplateResponse mapTemplateToResponse(NotificationTemplate template) {
+        return NotificationTemplateResponse.builder()
+            .id(template.getId())
+            .type(template.getType())
+            .channel(template.getChannel())
+            .language(template.getLanguage())
+            .subject(template.getSubject())
+            .template(template.getTemplate())
+            .variables(template.getVariables())
+            .createdAt(template.getCreatedAt())
+            .updatedAt(template.getUpdatedAt())
             .build();
     }
 }

@@ -4,6 +4,8 @@ import com.api_portal.backend.modules.notification.domain.enums.NotificationType
 import com.api_portal.backend.modules.notification.dto.NotificationPreferenceRequest;
 import com.api_portal.backend.modules.notification.dto.NotificationPreferenceResponse;
 import com.api_portal.backend.modules.notification.dto.NotificationResponse;
+import com.api_portal.backend.modules.notification.dto.NotificationTemplateRequest;
+import com.api_portal.backend.modules.notification.dto.NotificationTemplateResponse;
 import com.api_portal.backend.modules.notification.service.EmailNotificationService;
 import com.api_portal.backend.modules.notification.service.NotificationService;
 import com.api_portal.backend.shared.security.RequiresPermission;
@@ -151,6 +153,45 @@ public class NotificationController {
             
             return ResponseEntity.badRequest().body(response);
         }
+    }
+    
+    @GetMapping("/templates")
+    @RequiresPermission("settings.manage")
+    @Operation(summary = "Listar todos os templates de notificação (apenas SUPER_ADMIN)")
+    public ResponseEntity<List<NotificationTemplateResponse>> getAllTemplates() {
+        return ResponseEntity.ok(notificationService.getAllTemplates());
+    }
+    
+    @GetMapping("/templates/{id}")
+    @RequiresPermission("settings.manage")
+    @Operation(summary = "Obter template por ID (apenas SUPER_ADMIN)")
+    public ResponseEntity<NotificationTemplateResponse> getTemplateById(@PathVariable UUID id) {
+        return ResponseEntity.ok(notificationService.getTemplateById(id));
+    }
+    
+    @PutMapping("/templates/{id}")
+    @RequiresPermission("settings.manage")
+    @Operation(summary = "Atualizar template de notificação (apenas SUPER_ADMIN)")
+    public ResponseEntity<NotificationTemplateResponse> updateTemplate(
+            @PathVariable UUID id,
+            @Valid @RequestBody NotificationTemplateRequest request) {
+        return ResponseEntity.ok(notificationService.updateTemplate(id, request));
+    }
+    
+    @PostMapping("/templates")
+    @RequiresPermission("settings.manage")
+    @Operation(summary = "Criar novo template de notificação (apenas SUPER_ADMIN)")
+    public ResponseEntity<NotificationTemplateResponse> createTemplate(
+            @Valid @RequestBody NotificationTemplateRequest request) {
+        return ResponseEntity.ok(notificationService.createTemplate(request));
+    }
+    
+    @DeleteMapping("/templates/{id}")
+    @RequiresPermission("settings.manage")
+    @Operation(summary = "Deletar template de notificação (apenas SUPER_ADMIN)")
+    public ResponseEntity<Void> deleteTemplate(@PathVariable UUID id) {
+        notificationService.deleteTemplate(id);
+        return ResponseEntity.noContent().build();
     }
     
     private String getUserId(Authentication authentication) {
