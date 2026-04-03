@@ -81,5 +81,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     // Métodos para rankings e alertas
     long countByApiId(UUID apiId);
     
+    long countByApiIdAndStatus(UUID apiId, SubscriptionStatus status);
+    
     List<Subscription> findByStatusAndCreatedAtBefore(SubscriptionStatus status, java.time.LocalDateTime date);
 }

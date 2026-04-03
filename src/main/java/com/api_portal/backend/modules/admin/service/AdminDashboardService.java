@@ -9,6 +9,9 @@ import com.api_portal.backend.modules.admin.dto.UsageMetricsResponse;
 import com.api_portal.backend.modules.api.domain.Api;
 import com.api_portal.backend.modules.api.domain.enums.ApiStatus;
 import com.api_portal.backend.modules.api.repository.ApiRepository;
+import com.api_portal.backend.modules.metrics.domain.entity.ApiMetricDaily;
+import com.api_portal.backend.modules.metrics.domain.repository.ApiMetricDailyRepository;
+import com.api_portal.backend.modules.metrics.domain.repository.ApiMetricRepository;
 import com.api_portal.backend.modules.subscription.domain.entity.Subscription;
 import com.api_portal.backend.modules.subscription.domain.enums.SubscriptionStatus;
 import com.api_portal.backend.modules.subscription.domain.repository.SubscriptionRepository;
@@ -23,8 +26,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -35,6 +40,8 @@ public class AdminDashboardService {
     private final UserRepository userRepository;
     private final ApiRepository apiRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final ApiMetricRepository metricRepository;
+    private final ApiMetricDailyRepository dailyMetricRepository;
     
     @Transactional(readOnly = true)
     public DashboardStatsResponse getDashboardStats() {
@@ -405,23 +412,28 @@ public class AdminDashboardService {
     
     @Transactional(readOnly = true)
     public UsageMetricsResponse getUsageMetrics(int days) {
-        // TODO: Substituir por dados reais quando sistema de métricas for implementado
-        // Por enquanto, gerando dados simulados baseados nas subscriptions existentes
+        LocalDate endDate = LocalDate.now();
+        LocalDate startDate = endDate.minusDays(days);
         
-        List<Api> publishedApis = apiRepository.findByStatus(ApiStatus.PUBLISHED);
-        List<Subscription> activeSubscriptions = subscriptionRepository.findByStatus(SubscriptionStatus.ACTIVE);
+        // Buscar métricas diárias
+        List<ApiMetricDaily> dailyMetrics = dailyMetricRepository.findByMetricDateBetween(startDate, endDate);
+        
+        // Se não houver métricas, retornar dados vazios
+        if (dailyMetrics.isEmpty()) {
+            return generateEmptyMetrics(days);
+        }
         
         // Sumário de uso
-        UsageMetricsResponse.UsageSummary summary = generateUsageSummary(publishedApis, activeSubscriptions);
+        UsageMetricsResponse.UsageSummary summary = generateRealUsageSummary(dailyMetrics, startDate);
         
-        // Uso diário (últimos N dias)
-        List<UsageMetricsResponse.DailyUsage> dailyUsage = generateDailyUsage(days);
+        // Uso diário
+        List<UsageMetricsResponse.DailyUsage> dailyUsage = generateRealDailyUsage(startDate, endDate, dailyMetrics);
         
         // Top APIs por uso
-        List<UsageMetricsResponse.TopApiUsage> topApis = generateTopApiUsage(publishedApis);
+        List<UsageMetricsResponse.TopApiUsage> topApis = generateRealTopApiUsage(startDate);
         
         // Performance por API
-        Map<String, UsageMetricsResponse.PerformanceMetrics> apiPerformance = generateApiPerformance(publishedApis);
+        Map<String, UsageMetricsResponse.PerformanceMetrics> apiPerformance = generateRealApiPerformance(dailyMetrics);
         
         return UsageMetricsResponse.builder()
             .summary(summary)
@@ -431,89 +443,219 @@ public class AdminDashboardService {
             .build();
     }
     
-    private UsageMetricsResponse.UsageSummary generateUsageSummary(List<Api> apis, List<Subscription> subscriptions) {
-        long activeApis = apis.size();
-        long totalSubscriptions = subscriptions.size();
+    private UsageMetricsResponse generateEmptyMetrics(int days) {
+        LocalDate today = LocalDate.now();
+        List<UsageMetricsResponse.DailyUsage> dailyUsage = new ArrayList<>();
         
-        // Simulando métricas baseadas em subscriptions
-        long estimatedCallsPerDay = totalSubscriptions * 100; // 100 calls por subscription/dia
-        long totalCallsLast30Days = estimatedCallsPerDay * 30;
+        for (int i = days - 1; i >= 0; i--) {
+            dailyUsage.add(UsageMetricsResponse.DailyUsage.builder()
+                .date(today.minusDays(i))
+                .totalCalls(0L)
+                .successCalls(0L)
+                .errorCalls(0L)
+                .averageResponseTime(0.0)
+                .build());
+        }
+        
+        return UsageMetricsResponse.builder()
+            .summary(UsageMetricsResponse.UsageSummary.builder()
+                .totalCalls(0L)
+                .totalCallsLast30Days(0L)
+                .totalCallsToday(0L)
+                .averageResponseTime(0.0)
+                .errorRate(0.0)
+                .activeApis(0L)
+                .build())
+            .dailyUsage(dailyUsage)
+            .topApis(new ArrayList<>())
+            .apiPerformance(new HashMap<>())
+            .build();
+    }
+    
+    private UsageMetricsResponse.UsageSummary generateRealUsageSummary(
+            List<ApiMetricDaily> dailyMetrics, LocalDate startDate) {
+        
+        long totalCalls = dailyMetrics.stream()
+            .mapToLong(ApiMetricDaily::getTotalCalls)
+            .sum();
+        
+        long totalErrors = dailyMetrics.stream()
+            .mapToLong(ApiMetricDaily::getErrorCalls)
+            .sum();
+        
+        double avgResponseTime = dailyMetrics.stream()
+            .mapToDouble(ApiMetricDaily::getAvgResponseTime)
+            .average()
+            .orElse(0.0);
+        
+        double errorRate = totalCalls > 0 ? (totalErrors * 100.0) / totalCalls : 0.0;
+        
+        long activeApis = dailyMetrics.stream()
+            .map(ApiMetricDaily::getApiId)
+            .distinct()
+            .count();
+        
+        // Chamadas de hoje
+        LocalDate today = LocalDate.now();
+        long totalCallsToday = dailyMetrics.stream()
+            .filter(m -> m.getMetricDate().equals(today))
+            .mapToLong(ApiMetricDaily::getTotalCalls)
+            .sum();
+        
+        // Chamadas últimos 30 dias
+        LocalDate thirtyDaysAgo = LocalDate.now().minusDays(30);
+        Long totalCallsLast30Days = dailyMetricRepository.getTotalCallsAfter(thirtyDaysAgo);
+        if (totalCallsLast30Days == null) totalCallsLast30Days = 0L;
         
         return UsageMetricsResponse.UsageSummary.builder()
-            .totalCalls(totalCallsLast30Days)
+            .totalCalls(totalCalls)
             .totalCallsLast30Days(totalCallsLast30Days)
-            .totalCallsToday(estimatedCallsPerDay)
-            .averageResponseTime(150.0 + (Math.random() * 100)) // 150-250ms
-            .errorRate(0.5 + (Math.random() * 2)) // 0.5-2.5%
+            .totalCallsToday(totalCallsToday)
+            .averageResponseTime(avgResponseTime)
+            .errorRate(errorRate)
             .activeApis(activeApis)
             .build();
     }
     
-    private List<UsageMetricsResponse.DailyUsage> generateDailyUsage(int days) {
-        List<UsageMetricsResponse.DailyUsage> dailyUsage = new ArrayList<>();
-        LocalDate today = LocalDate.now();
+    private List<UsageMetricsResponse.DailyUsage> generateRealDailyUsage(
+            LocalDate startDate, LocalDate endDate, List<ApiMetricDaily> dailyMetrics) {
         
-        for (int i = days - 1; i >= 0; i--) {
-            LocalDate date = today.minusDays(i);
-            long baseCalls = 5000 + (long)(Math.random() * 3000);
-            long errorCalls = (long)(baseCalls * (0.01 + Math.random() * 0.02));
+        List<UsageMetricsResponse.DailyUsage> result = new ArrayList<>();
+        
+        // Criar mapa para acesso rápido
+        Map<LocalDate, List<ApiMetricDaily>> metricsByDate = dailyMetrics.stream()
+            .collect(Collectors.groupingBy(ApiMetricDaily::getMetricDate));
+        
+        // Gerar dados para cada dia
+        LocalDate current = startDate;
+        while (!current.isAfter(endDate)) {
+            List<ApiMetricDaily> dayMetrics = metricsByDate.getOrDefault(current, new ArrayList<>());
             
-            dailyUsage.add(UsageMetricsResponse.DailyUsage.builder()
-                .date(date)
-                .totalCalls(baseCalls)
-                .successCalls(baseCalls - errorCalls)
+            long totalCalls = dayMetrics.stream().mapToLong(ApiMetricDaily::getTotalCalls).sum();
+            long successCalls = dayMetrics.stream().mapToLong(ApiMetricDaily::getSuccessCalls).sum();
+            long errorCalls = dayMetrics.stream().mapToLong(ApiMetricDaily::getErrorCalls).sum();
+            double avgResponseTime = dayMetrics.stream()
+                .mapToDouble(ApiMetricDaily::getAvgResponseTime)
+                .average()
+                .orElse(0.0);
+            
+            result.add(UsageMetricsResponse.DailyUsage.builder()
+                .date(current)
+                .totalCalls(totalCalls)
+                .successCalls(successCalls)
                 .errorCalls(errorCalls)
-                .averageResponseTime(150.0 + (Math.random() * 100))
+                .averageResponseTime(avgResponseTime)
+                .build());
+            
+            current = current.plusDays(1);
+        }
+        
+        return result;
+    }
+    
+    private List<UsageMetricsResponse.TopApiUsage> generateRealTopApiUsage(LocalDate startDate) {
+        List<Object[]> topApiData = dailyMetricRepository.findTopApisByTotalCalls(startDate);
+        
+        List<UsageMetricsResponse.TopApiUsage> result = new ArrayList<>();
+        
+        for (Object[] data : topApiData) {
+            if (result.size() >= 10) break;
+            
+            UUID apiId = (UUID) data[0];
+            Long totalCalls = ((Number) data[1]).longValue();
+            
+            Api api = apiRepository.findById(apiId).orElse(null);
+            if (api == null) continue;
+            
+            // Buscar métricas específicas da API
+            List<ApiMetricDaily> apiMetrics = dailyMetricRepository
+                .findByApiIdAndMetricDateBetween(apiId, startDate, LocalDate.now());
+            
+            double avgResponseTime = apiMetrics.stream()
+                .mapToDouble(ApiMetricDaily::getAvgResponseTime)
+                .average()
+                .orElse(0.0);
+            
+            long totalErrors = apiMetrics.stream()
+                .mapToLong(ApiMetricDaily::getErrorCalls)
+                .sum();
+            
+            double errorRate = totalCalls > 0 ? (totalErrors * 100.0) / totalCalls : 0.0;
+            
+            long activeSubscriptions = subscriptionRepository.countByApiIdAndStatus(
+                apiId, SubscriptionStatus.ACTIVE);
+            
+            result.add(UsageMetricsResponse.TopApiUsage.builder()
+                .apiId(apiId)
+                .apiName(api.getName())
+                .apiSlug(api.getSlug())
+                .totalCalls(totalCalls)
+                .averageResponseTime(avgResponseTime)
+                .errorRate(errorRate)
+                .activeSubscriptions(activeSubscriptions)
                 .build());
         }
         
-        return dailyUsage;
+        return result;
     }
     
-    private List<UsageMetricsResponse.TopApiUsage> generateTopApiUsage(List<Api> apis) {
-        return apis.stream()
-            .limit(10)
-            .map(api -> {
-                long subscriptionCount = subscriptionRepository.countByApiId(api.getId());
-                long estimatedCalls = subscriptionCount * 100 * 30; // 100 calls/dia * 30 dias
-                
-                return UsageMetricsResponse.TopApiUsage.builder()
-                    .apiId(api.getId())
-                    .apiName(api.getName())
-                    .apiSlug(api.getSlug())
-                    .totalCalls(estimatedCalls)
-                    .averageResponseTime(150.0 + (Math.random() * 150))
-                    .errorRate(0.5 + (Math.random() * 2))
-                    .activeSubscriptions(subscriptionCount)
-                    .build();
-            })
-            .sorted((a, b) -> Long.compare(b.getTotalCalls(), a.getTotalCalls()))
-            .limit(10)
-            .collect(Collectors.toList());
-    }
-    
-    private Map<String, UsageMetricsResponse.PerformanceMetrics> generateApiPerformance(List<Api> apis) {
-        return apis.stream()
-            .limit(10)
-            .collect(Collectors.toMap(
-                Api::getSlug,
-                api -> {
-                    double avgResponse = 150.0 + (Math.random() * 150);
-                    long totalReqs = subscriptionRepository.countByApiId(api.getId()) * 3000;
-                    long errorReqs = (long)(totalReqs * (0.01 + Math.random() * 0.02));
-                    
-                    return UsageMetricsResponse.PerformanceMetrics.builder()
-                        .apiName(api.getName())
-                        .averageResponseTime(avgResponse)
-                        .minResponseTime(avgResponse * 0.5)
-                        .maxResponseTime(avgResponse * 2.5)
-                        .errorRate((errorReqs * 100.0) / totalReqs)
-                        .totalRequests(totalReqs)
-                        .successRequests(totalReqs - errorReqs)
-                        .errorRequests(errorReqs)
-                        .build();
-                }
-            ));
+    private Map<String, UsageMetricsResponse.PerformanceMetrics> generateRealApiPerformance(
+            List<ApiMetricDaily> dailyMetrics) {
+        
+        Map<UUID, List<ApiMetricDaily>> metricsByApi = dailyMetrics.stream()
+            .collect(Collectors.groupingBy(ApiMetricDaily::getApiId));
+        
+        Map<String, UsageMetricsResponse.PerformanceMetrics> result = new HashMap<>();
+        
+        for (Map.Entry<UUID, List<ApiMetricDaily>> entry : metricsByApi.entrySet()) {
+            UUID apiId = entry.getKey();
+            List<ApiMetricDaily> apiMetrics = entry.getValue();
+            
+            Api api = apiRepository.findById(apiId).orElse(null);
+            if (api == null) continue;
+            
+            double avgResponseTime = apiMetrics.stream()
+                .mapToDouble(ApiMetricDaily::getAvgResponseTime)
+                .average()
+                .orElse(0.0);
+            
+            double minResponseTime = apiMetrics.stream()
+                .mapToDouble(ApiMetricDaily::getMinResponseTime)
+                .min()
+                .orElse(0.0);
+            
+            double maxResponseTime = apiMetrics.stream()
+                .mapToDouble(ApiMetricDaily::getMaxResponseTime)
+                .max()
+                .orElse(0.0);
+            
+            long totalRequests = apiMetrics.stream()
+                .mapToLong(ApiMetricDaily::getTotalCalls)
+                .sum();
+            
+            long successRequests = apiMetrics.stream()
+                .mapToLong(ApiMetricDaily::getSuccessCalls)
+                .sum();
+            
+            long errorRequests = apiMetrics.stream()
+                .mapToLong(ApiMetricDaily::getErrorCalls)
+                .sum();
+            
+            double errorRate = totalRequests > 0 ? (errorRequests * 100.0) / totalRequests : 0.0;
+            
+            result.put(api.getSlug(), UsageMetricsResponse.PerformanceMetrics.builder()
+                .apiName(api.getName())
+                .averageResponseTime(avgResponseTime)
+                .minResponseTime(minResponseTime)
+                .maxResponseTime(maxResponseTime)
+                .errorRate(errorRate)
+                .totalRequests(totalRequests)
+                .successRequests(successRequests)
+                .errorRequests(errorRequests)
+                .build());
+        }
+        
+        return result;
     }
 
 }
