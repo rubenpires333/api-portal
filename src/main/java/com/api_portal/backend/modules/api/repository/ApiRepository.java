@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,4 +50,22 @@ public interface ApiRepository extends JpaRepository<Api, UUID> {
     boolean existsBySlug(String slug);
     
     long countByProviderId(String providerId);
+    
+    // Métodos para dashboard
+    long countByStatus(ApiStatus status);
+    
+    long countByCreatedAtAfter(LocalDateTime date);
+    
+    long countByCreatedAtBefore(LocalDateTime date);
+    
+    List<Api> findTop5ByStatusOrderByPublishedAtDesc(ApiStatus status);
+    
+    List<Api> findTop10ByPublishedAtAfterOrderByPublishedAtDesc(LocalDateTime date);
+    
+    // Métodos para rankings e alertas
+    List<Api> findByStatus(ApiStatus status);
+    
+    List<Api> findByStatusAndPublishedAtBefore(ApiStatus status, LocalDateTime date);
+    
+    List<Api> findByStatusAndCreatedAtBefore(ApiStatus status, LocalDateTime date);
 }

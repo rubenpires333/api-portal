@@ -66,4 +66,20 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     
     @Query("SELECT s.consumerEmail, s.consumerName, SUM(s.requestsUsed) FROM Subscription s WHERE s.api.providerId = :providerId AND s.status = 'ACTIVE' GROUP BY s.consumerEmail, s.consumerName ORDER BY SUM(s.requestsUsed) DESC")
     List<Object[]> findTopConsumersByProvider(@Param("providerId") String providerId);
+    
+    // Métodos para dashboard
+    long countByStatus(SubscriptionStatus status);
+    
+    long countByCreatedAtBefore(java.time.LocalDateTime date);
+    
+    List<Subscription> findTop5ByOrderByCreatedAtDesc();
+    
+    List<Subscription> findTop10ByCreatedAtAfterOrderByCreatedAtDesc(java.time.LocalDateTime date);
+    
+    List<Subscription> findByStatusOrderByCreatedAtAsc(SubscriptionStatus status);
+    
+    // Métodos para rankings e alertas
+    long countByApiId(UUID apiId);
+    
+    List<Subscription> findByStatusAndCreatedAtBefore(SubscriptionStatus status, java.time.LocalDateTime date);
 }
