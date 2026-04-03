@@ -84,6 +84,32 @@ public class NotificationService {
     }
     
     /**
+     * Buscar notificações por texto
+     */
+    @Transactional(readOnly = true)
+    public Page<NotificationResponse> searchNotifications(
+            String userId, 
+            String search,
+            NotificationType type,
+            Pageable pageable) {
+        
+        if (search == null || search.trim().isEmpty()) {
+            if (type != null) {
+                return getMyNotificationsByType(userId, type, pageable);
+            }
+            return getMyNotifications(userId, pageable);
+        }
+        
+        if (type != null) {
+            return notificationRepository.searchByUserIdAndTypeAndTitleOrMessage(userId, type, search, pageable)
+                .map(this::mapToResponse);
+        }
+        
+        return notificationRepository.searchByUserIdAndTitleOrMessage(userId, search, pageable)
+            .map(this::mapToResponse);
+    }
+    
+    /**
      * Listar notificações por tipo
      */
     @Transactional(readOnly = true)
@@ -106,10 +132,12 @@ public class NotificationService {
     
     /**
      * Obter últimas notificações (para dropdown)
+     * Retorna 4 notificações com prioridade para não lidas
      */
     @Transactional(readOnly = true)
     public List<NotificationResponse> getRecentNotifications(String userId) {
-        return notificationRepository.findTop10ByUserIdOrderByCreatedAtDesc(userId)
+        Pageable pageable = Pageable.ofSize(4);
+        return notificationRepository.findTop4ByUserIdOrderByIsReadAndCreatedAt(userId, pageable)
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());

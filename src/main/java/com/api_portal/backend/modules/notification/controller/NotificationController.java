@@ -43,6 +43,7 @@ public class NotificationController {
     public ResponseEntity<Page<NotificationResponse>> getMyNotifications(
             @RequestParam(required = false) NotificationType type,
             @RequestParam(required = false) Boolean unreadOnly,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             Authentication authentication) {
@@ -52,7 +53,10 @@ public class NotificationController {
         
         Page<NotificationResponse> notifications;
         
-        if (type != null) {
+        // Se tem busca, usar método de busca
+        if (search != null && !search.trim().isEmpty()) {
+            notifications = notificationService.searchNotifications(userId, search, type, pageable);
+        } else if (type != null) {
             notifications = notificationService.getMyNotificationsByType(userId, type, pageable);
         } else if (Boolean.TRUE.equals(unreadOnly)) {
             notifications = notificationService.getUnreadNotifications(userId, pageable);

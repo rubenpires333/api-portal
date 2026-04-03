@@ -22,7 +22,29 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     
     Page<Notification> findByUserIdAndIsReadOrderByCreatedAtDesc(String userId, Boolean isRead, Pageable pageable);
     
+    @Query("SELECT n FROM Notification n WHERE n.userId = :userId " +
+           "AND (LOWER(n.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(n.message) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "ORDER BY n.createdAt DESC")
+    Page<Notification> searchByUserIdAndTitleOrMessage(@Param("userId") String userId, 
+                                                        @Param("search") String search, 
+                                                        Pageable pageable);
+    
+    @Query("SELECT n FROM Notification n WHERE n.userId = :userId " +
+           "AND n.type = :type " +
+           "AND (LOWER(n.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(n.message) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "ORDER BY n.createdAt DESC")
+    Page<Notification> searchByUserIdAndTypeAndTitleOrMessage(@Param("userId") String userId,
+                                                               @Param("type") NotificationType type,
+                                                               @Param("search") String search,
+                                                               Pageable pageable);
+    
     List<Notification> findTop10ByUserIdOrderByCreatedAtDesc(String userId);
+    
+    @Query("SELECT n FROM Notification n WHERE n.userId = :userId " +
+           "ORDER BY n.isRead ASC, n.createdAt DESC")
+    List<Notification> findTop4ByUserIdOrderByIsReadAndCreatedAt(@Param("userId") String userId, Pageable pageable);
     
     long countByUserIdAndIsRead(String userId, Boolean isRead);
     
