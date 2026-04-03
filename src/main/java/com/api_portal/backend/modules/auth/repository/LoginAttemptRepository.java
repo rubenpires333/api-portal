@@ -8,9 +8,10 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface LoginAttemptRepository extends JpaRepository<LoginAttempt, Long> {
+public interface LoginAttemptRepository extends JpaRepository<LoginAttempt, UUID> {
     
     Optional<LoginAttempt> findByEmailAndIpAddress(String email, String ipAddress);
     

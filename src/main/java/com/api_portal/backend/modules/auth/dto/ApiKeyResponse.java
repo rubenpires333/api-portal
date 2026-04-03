@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Data
 @Builder
@@ -15,8 +16,8 @@ import java.time.LocalDateTime;
 @Schema(description = "Response com dados da API Key")
 public class ApiKeyResponse {
     
-    @Schema(description = "ID da API Key", example = "1")
-    private Long id;
+    @Schema(description = "ID da API Key")
+    private UUID id;
     
     @Schema(description = "Valor da API Key (apenas na criação)", example = "abc123def456...")
     private String keyValue;

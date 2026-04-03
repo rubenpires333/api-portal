@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,7 +44,7 @@ public class HelpService {
                 .collect(Collectors.toList());
     }
     
-    public HelpCategoryDTO getCategoryById(Long id) {
+    public HelpCategoryDTO getCategoryById(UUID id) {
         HelpCategory category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
         return convertCategoryToDTO(category);
@@ -62,7 +63,7 @@ public class HelpService {
     }
     
     @Transactional
-    public HelpCategoryDTO updateCategory(Long id, HelpCategoryDTO dto) {
+    public HelpCategoryDTO updateCategory(UUID id, HelpCategoryDTO dto) {
         HelpCategory category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
         
@@ -76,19 +77,19 @@ public class HelpService {
     }
     
     @Transactional
-    public void deleteCategory(Long id) {
+    public void deleteCategory(UUID id) {
         categoryRepository.deleteById(id);
     }
     
     // FAQ methods
-    public List<HelpFaqDTO> getFaqsByCategory(Long categoryId) {
+    public List<HelpFaqDTO> getFaqsByCategory(UUID categoryId) {
         return faqRepository.findByCategoryIdOrderByDisplayOrderAsc(categoryId)
                 .stream()
                 .map(this::convertFaqToDTO)
                 .collect(Collectors.toList());
     }
     
-    public HelpFaqDTO getFaqById(Long id) {
+    public HelpFaqDTO getFaqById(UUID id) {
         HelpFaq faq = faqRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("FAQ não encontrado"));
         return convertFaqToDTO(faq);
@@ -111,7 +112,7 @@ public class HelpService {
     }
     
     @Transactional
-    public HelpFaqDTO updateFaq(Long id, HelpFaqDTO dto) {
+    public HelpFaqDTO updateFaq(UUID id, HelpFaqDTO dto) {
         HelpFaq faq = faqRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("FAQ não encontrado"));
         
@@ -131,7 +132,7 @@ public class HelpService {
     }
     
     @Transactional
-    public void deleteFaq(Long id) {
+    public void deleteFaq(UUID id) {
         faqRepository.deleteById(id);
     }
     

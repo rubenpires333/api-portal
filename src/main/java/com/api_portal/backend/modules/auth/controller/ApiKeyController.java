@@ -18,6 +18,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
@@ -87,7 +88,7 @@ public class ApiKeyController {
         @ApiResponse(responseCode = "404", description = "API Key não encontrada")
     })
     public ResponseEntity<ApiKeyResponse> getApiKeyById(
-            @PathVariable Long id,
+            @PathVariable UUID id,
             Authentication authentication) {
         String userId = getUserId(authentication);
         
@@ -108,7 +109,7 @@ public class ApiKeyController {
         @ApiResponse(responseCode = "404", description = "API Key não encontrada")
     })
     public ResponseEntity<Void> revokeApiKey(
-            @PathVariable Long id,
+            @PathVariable UUID id,
             Authentication authentication) {
         
         String userId = getUserId(authentication);

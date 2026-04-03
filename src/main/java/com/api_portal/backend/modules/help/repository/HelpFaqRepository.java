@@ -7,11 +7,12 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.UUID;
 
 @Repository
-public interface HelpFaqRepository extends JpaRepository<HelpFaq, Long> {
-    List<HelpFaq> findByCategoryIdAndActiveOrderByDisplayOrderAsc(Long categoryId, Boolean active);
-    List<HelpFaq> findByCategoryIdOrderByDisplayOrderAsc(Long categoryId);
+public interface HelpFaqRepository extends JpaRepository<HelpFaq, UUID> {
+    List<HelpFaq> findByCategoryIdAndActiveOrderByDisplayOrderAsc(UUID categoryId, Boolean active);
+    List<HelpFaq> findByCategoryIdOrderByDisplayOrderAsc(UUID categoryId);
     
     @Query("SELECT f FROM HelpFaq f WHERE f.active = true AND " +
            "(LOWER(f.question) LIKE LOWER(CONCAT('%', :search, '%')) OR " +

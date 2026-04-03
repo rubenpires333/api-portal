@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/admin/help")
@@ -24,7 +25,7 @@ public class HelpAdminController {
     }
     
     @GetMapping("/categories/{id}")
-    public ResponseEntity<HelpCategoryDTO> getCategoryById(@PathVariable Long id) {
+    public ResponseEntity<HelpCategoryDTO> getCategoryById(@PathVariable UUID id) {
         return ResponseEntity.ok(helpService.getCategoryById(id));
     }
     
@@ -34,24 +35,24 @@ public class HelpAdminController {
     }
     
     @PutMapping("/categories/{id}")
-    public ResponseEntity<HelpCategoryDTO> updateCategory(@PathVariable Long id, @RequestBody HelpCategoryDTO dto) {
+    public ResponseEntity<HelpCategoryDTO> updateCategory(@PathVariable UUID id, @RequestBody HelpCategoryDTO dto) {
         return ResponseEntity.ok(helpService.updateCategory(id, dto));
     }
     
     @DeleteMapping("/categories/{id}")
-    public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteCategory(@PathVariable UUID id) {
         helpService.deleteCategory(id);
         return ResponseEntity.noContent().build();
     }
     
     // FAQ management
     @GetMapping("/categories/{categoryId}/faqs")
-    public ResponseEntity<List<HelpFaqDTO>> getFaqsByCategory(@PathVariable Long categoryId) {
+    public ResponseEntity<List<HelpFaqDTO>> getFaqsByCategory(@PathVariable UUID categoryId) {
         return ResponseEntity.ok(helpService.getFaqsByCategory(categoryId));
     }
     
     @GetMapping("/faqs/{id}")
-    public ResponseEntity<HelpFaqDTO> getFaqById(@PathVariable Long id) {
+    public ResponseEntity<HelpFaqDTO> getFaqById(@PathVariable UUID id) {
         return ResponseEntity.ok(helpService.getFaqById(id));
     }
     
@@ -61,12 +62,12 @@ public class HelpAdminController {
     }
     
     @PutMapping("/faqs/{id}")
-    public ResponseEntity<HelpFaqDTO> updateFaq(@PathVariable Long id, @RequestBody HelpFaqDTO dto) {
+    public ResponseEntity<HelpFaqDTO> updateFaq(@PathVariable UUID id, @RequestBody HelpFaqDTO dto) {
         return ResponseEntity.ok(helpService.updateFaq(id, dto));
     }
     
     @DeleteMapping("/faqs/{id}")
-    public ResponseEntity<Void> deleteFaq(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteFaq(@PathVariable UUID id) {
         helpService.deleteFaq(id);
         return ResponseEntity.noContent().build();
     }

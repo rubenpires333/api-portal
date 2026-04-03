@@ -2,6 +2,7 @@ package com.api_portal.backend.modules.auth.service;
 
 import com.api_portal.backend.modules.auth.domain.LoginAttempt;
 import com.api_portal.backend.modules.auth.repository.LoginAttemptRepository;
+import com.api_portal.backend.modules.settings.service.PlatformSettingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,11 +17,7 @@ import java.time.LocalDateTime;
 public class LoginAttemptService {
     
     private final LoginAttemptRepository loginAttemptRepository;
-    
-    private static final int MAX_ATTEMPTS_BEFORE_CAPTCHA = 3;
-    private static final int MAX_ATTEMPTS_BEFORE_BLOCK = 5;
-    private static final int BLOCK_DURATION_MINUTES = 15;
-    private static final int RESET_ATTEMPTS_HOURS = 24;
+    private final PlatformSettingService platformSettingService;
     
     /**
      * Verifica se o usuário precisa de CAPTCHA
@@ -84,6 +81,11 @@ public class LoginAttemptService {
      */
     @Transactional
     public void recordFailedAttempt(String email, String ipAddress) {
+        // Obter configurações do banco
+        int maxAttemptsCaptcha = platformSettingService.getIntSetting("security.login.max.attempts.captcha", 3);
+        int maxAttemptsBlock = platformSettingService.getIntSetting("security.login.max.attempts.block", 5);
+        int blockDurationMinutes = platformSettingService.getIntSetting("security.login.block.duration.minutes", 15);
+        
         LoginAttempt attempt = loginAttemptRepository
             .findByEmailAndIpAddress(email, ipAddress)
             .orElse(LoginAttempt.builder()
@@ -97,18 +99,18 @@ public class LoginAttemptService {
         attempt.setAttempts(attempt.getAttempts() + 1);
         attempt.setLastAttempt(LocalDateTime.now());
         
-        // Ativar CAPTCHA após 3 tentativas
-        if (attempt.getAttempts() >= MAX_ATTEMPTS_BEFORE_CAPTCHA) {
+        // Ativar CAPTCHA após X tentativas (configurável)
+        if (attempt.getAttempts() >= maxAttemptsCaptcha) {
             attempt.setRequiresCaptcha(true);
             log.warn("CAPTCHA ativado para {} (IP: {}) após {} tentativas", 
                 email, ipAddress, attempt.getAttempts());
         }
         
-        // Bloquear após 5 tentativas
-        if (attempt.getAttempts() >= MAX_ATTEMPTS_BEFORE_BLOCK) {
-            attempt.setBlockedUntil(LocalDateTime.now().plusMinutes(BLOCK_DURATION_MINUTES));
+        // Bloquear após Y tentativas (configurável)
+        if (attempt.getAttempts() >= maxAttemptsBlock) {
+            attempt.setBlockedUntil(LocalDateTime.now().plusMinutes(blockDurationMinutes));
             log.warn("Usuário {} (IP: {}) bloqueado por {} minutos após {} tentativas", 
-                email, ipAddress, BLOCK_DURATION_MINUTES, attempt.getAttempts());
+                email, ipAddress, blockDurationMinutes, attempt.getAttempts());
         }
         
         loginAttemptRepository.save(attempt);
@@ -132,7 +134,8 @@ public class LoginAttemptService {
     @Scheduled(cron = "0 0 2 * * *") // 2h da manhã todos os dias
     @Transactional
     public void cleanupOldAttempts() {
-        LocalDateTime cutoffTime = LocalDateTime.now().minusHours(RESET_ATTEMPTS_HOURS);
+        int resetHours = platformSettingService.getIntSetting("security.login.reset.attempts.hours", 24);
+        LocalDateTime cutoffTime = LocalDateTime.now().minusHours(resetHours);
         loginAttemptRepository.deleteOldAttempts(cutoffTime);
         log.info("Limpeza de tentativas de login antigas concluída");
     }

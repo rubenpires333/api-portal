@@ -1,8 +1,8 @@
 package com.api_portal.backend.modules.auth.service;
 
+import com.api_portal.backend.modules.settings.service.PlatformSettingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -17,12 +17,7 @@ import java.util.Map;
 public class RecaptchaService {
     
     private final RestTemplate restTemplate;
-    
-    @Value("${recaptcha.secret-key:}")
-    private String secretKey;
-    
-    @Value("${recaptcha.enabled:false}")
-    private boolean recaptchaEnabled;
+    private final PlatformSettingService platformSettingService;
     
     private static final String RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
     
@@ -30,6 +25,10 @@ public class RecaptchaService {
      * Valida o token do reCAPTCHA
      */
     public boolean validateCaptcha(String captchaResponse) {
+        // Obter configurações do banco de dados
+        boolean recaptchaEnabled = platformSettingService.getBooleanSetting("recaptcha.enabled", false);
+        String secretKey = platformSettingService.getSetting("recaptcha.secret.key", "");
+        
         // Se reCAPTCHA estiver desabilitado, sempre retornar true
         if (!recaptchaEnabled || secretKey == null || secretKey.isEmpty()) {
             log.debug("reCAPTCHA desabilitado, pulando validação");

@@ -5,9 +5,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.UUID;
 
 @Repository
-public interface HelpCategoryRepository extends JpaRepository<HelpCategory, Long> {
+public interface HelpCategoryRepository extends JpaRepository<HelpCategory, UUID> {
     List<HelpCategory> findByActiveOrderByDisplayOrderAsc(Boolean active);
     List<HelpCategory> findAllByOrderByDisplayOrderAsc();
 }

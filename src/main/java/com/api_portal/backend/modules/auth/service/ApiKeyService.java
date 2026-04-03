@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -83,7 +84,7 @@ public class ApiKeyService {
         return apiKeyRepository.findByUserIdAndActiveTrue(userId);
     }
     
-    public ApiKey getApiKeyById(Long apiKeyId, String userId) {
+    public ApiKey getApiKeyById(UUID apiKeyId, String userId) {
         ApiKey apiKey = apiKeyRepository.findById(apiKeyId)
             .orElseThrow(() -> new AuthException("API Key não encontrada"));
         
@@ -95,7 +96,7 @@ public class ApiKeyService {
     }
     
     @Transactional
-    public void revokeApiKey(Long apiKeyId, String userId) {
+    public void revokeApiKey(UUID apiKeyId, String userId) {
         ApiKey apiKey = apiKeyRepository.findById(apiKeyId)
             .orElseThrow(() -> new AuthException("API Key não encontrada"));
         
@@ -110,7 +111,7 @@ public class ApiKeyService {
     }
     
     @Transactional
-    public void deleteApiKey(Long apiKeyId, String userId) {
+    public void deleteApiKey(UUID apiKeyId, String userId) {
         ApiKey apiKey = apiKeyRepository.findById(apiKeyId)
             .orElseThrow(() -> new AuthException("API Key não encontrada"));
         
