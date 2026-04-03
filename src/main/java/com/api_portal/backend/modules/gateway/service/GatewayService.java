@@ -3,6 +3,8 @@ package com.api_portal.backend.modules.gateway.service;
 import com.api_portal.backend.modules.api.domain.Api;
 import com.api_portal.backend.modules.api.exception.ApiException;
 import com.api_portal.backend.modules.api.repository.ApiRepository;
+import com.api_portal.backend.modules.metrics.dto.ApiCallMetricRequest;
+import com.api_portal.backend.modules.metrics.service.ApiMetricService;
 import com.api_portal.backend.modules.subscription.domain.entity.Subscription;
 import com.api_portal.backend.modules.subscription.service.SubscriptionService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +26,7 @@ public class GatewayService {
     private final ApiRepository apiRepository;
     private final RestTemplate restTemplate;
     private final SubscriptionService subscriptionService;
+    private final ApiMetricService metricService;
     
     public ResponseEntity<?> proxyRequest(String slug, HttpServletRequest request, String body) {
         log.info("=== GATEWAY REQUEST ===");
@@ -164,6 +167,11 @@ public class GatewayService {
         log.info("Headers copiados: {}", headers.keySet());
         
         // 8. Fazer requisição
+        long startTime = System.currentTimeMillis();
+        int statusCode = 200;
+        String errorMessage = null;
+        UUID subscriptionId = null;
+        
         try {
             HttpEntity<String> entity = new HttpEntity<>(body, headers);
             HttpMethod method = HttpMethod.valueOf(request.getMethod());
@@ -177,15 +185,18 @@ public class GatewayService {
                 String.class
             );
             
+            statusCode = response.getStatusCode().value();
+            
             log.info("Gateway response: {} from {}", response.getStatusCode(), targetUrl);
             String responseBody = response.getBody();
             log.info("Response body length: {}", responseBody != null ? responseBody.length() : 0);
             
             // Incrementar contador de requisições se não for teste do provider
             if (!isProviderTest && request.getAttribute("subscriptionId") != null) {
-                String subscriptionId = (String) request.getAttribute("subscriptionId");
+                String subIdStr = (String) request.getAttribute("subscriptionId");
+                subscriptionId = UUID.fromString(subIdStr);
                 try {
-                    subscriptionService.incrementRequestCount(UUID.fromString(subscriptionId));
+                    subscriptionService.incrementRequestCount(subscriptionId);
                     log.debug("Request count incremented for subscription: {}", subscriptionId);
                 } catch (Exception e) {
                     log.error("Error incrementing request count for subscription {}: {}", subscriptionId, e.getMessage());
@@ -197,6 +208,9 @@ public class GatewayService {
             final int MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB
             if (responseBody != null && responseBody.length() > MAX_RESPONSE_SIZE) {
                 log.warn("Response too large: {} bytes (max: {})", responseBody.length(), MAX_RESPONSE_SIZE);
+                statusCode = HttpStatus.PAYLOAD_TOO_LARGE.value();
+                errorMessage = "Response too large";
+                
                 return ResponseEntity
                     .status(HttpStatus.PAYLOAD_TOO_LARGE)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -219,7 +233,8 @@ public class GatewayService {
         } catch (Exception e) {
             log.error("Error proxying request to {}: {}", targetUrl, e.getMessage(), e);
             
-            String errorMessage = "Erro ao acessar API: " + e.getMessage();
+            statusCode = HttpStatus.BAD_GATEWAY.value();
+            errorMessage = "Erro ao acessar API: " + e.getMessage();
             if (e.getCause() != null) {
                 errorMessage += " | Causa: " + e.getCause().getMessage();
             }
@@ -227,6 +242,13 @@ public class GatewayService {
             return ResponseEntity
                 .status(HttpStatus.BAD_GATEWAY)
                 .body(errorMessage);
+        } finally {
+            // Registrar métrica (sempre, sucesso ou erro)
+            long responseTime = System.currentTimeMillis() - startTime;
+            recordMetric(api.getId(), subscriptionId, consumerId, consumerEmail, 
+                path, request.getMethod(), statusCode, responseTime, 
+                body != null ? body.length() : 0, errorMessage, 
+                request.getHeader("User-Agent"), getClientIp(request));
         }
     }
     
@@ -236,5 +258,48 @@ public class GatewayService {
             return requestUri.substring(prefix.length());
         }
         return "";
+    }
+    
+    private void recordMetric(UUID apiId, UUID subscriptionId, String consumerId, String consumerName,
+                             String endpoint, String httpMethod, int statusCode, long responseTimeMs,
+                             long requestSize, String errorMessage, String userAgent, String ipAddress) {
+        try {
+            ApiCallMetricRequest metricRequest = ApiCallMetricRequest.builder()
+                .apiId(apiId)
+                .subscriptionId(subscriptionId)
+                .consumerId(consumerId)
+                .consumerName(consumerName)
+                .endpoint(endpoint)
+                .httpMethod(httpMethod)
+                .statusCode(statusCode)
+                .responseTimeMs((double) responseTimeMs)
+                .requestSizeBytes(requestSize)
+                .responseSizeBytes(0L) // Não temos o tamanho da resposta aqui
+                .errorMessage(errorMessage)
+                .userAgent(userAgent)
+                .ipAddress(ipAddress)
+                .build();
+            
+            metricService.recordApiCall(metricRequest);
+            log.debug("Métrica registrada para API {} - Status: {} - Tempo: {}ms", apiId, statusCode, responseTimeMs);
+        } catch (Exception e) {
+            log.error("Erro ao registrar métrica: {}", e.getMessage());
+            // Não falhar a requisição por causa de erro no registro de métrica
+        }
+    }
+    
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        // Se houver múltiplos IPs (proxy chain), pegar o primeiro
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }
