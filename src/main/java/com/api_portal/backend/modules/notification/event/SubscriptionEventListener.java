@@ -6,6 +6,7 @@ import com.api_portal.backend.modules.subscription.domain.entity.Subscription;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.HashMap;
@@ -18,7 +19,7 @@ public class SubscriptionEventListener {
     
     private final NotificationService notificationService;
     
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleSubscriptionRequested(SubscriptionRequestedEvent event) {
         Subscription subscription = event.getSubscription();
         
@@ -46,7 +47,7 @@ public class SubscriptionEventListener {
         );
     }
     
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleSubscriptionApproved(SubscriptionApprovedEvent event) {
         Subscription subscription = event.getSubscription();
         
@@ -73,7 +74,7 @@ public class SubscriptionEventListener {
         );
     }
     
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleSubscriptionRevoked(SubscriptionRevokedEvent event) {
         Subscription subscription = event.getSubscription();
         String reason = event.getReason();

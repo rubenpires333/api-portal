@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -32,13 +33,12 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final NotificationPreferenceRepository preferenceRepository;
     private final NotificationTemplateRepository templateRepository;
-    private final NotificationTemplateService templateService;
     private final EmailNotificationService emailService;
     
     /**
      * Criar e enviar notificação
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendNotification(
             String userId,
             String userEmail,
@@ -51,9 +51,9 @@ public class NotificationService {
         // Verificar preferências do usuário
         NotificationPreference preference = preferenceRepository
             .findByUserIdAndNotificationType(userId, type)
-            .orElse(createDefaultPreference(userId, type));
+            .orElseGet(() -> createDefaultPreference(userId, type));
         
-        // Criar notificação in-app (sempre)
+        // Criar notificação in-app
         if (preference.getInAppEnabled()) {
             Notification notification = Notification.builder()
                 .userId(userId)
@@ -169,11 +169,8 @@ public class NotificationService {
     public List<NotificationPreferenceResponse> getPreferences(String userId) {
         List<NotificationPreference> preferences = preferenceRepository.findByUserId(userId);
         
-        log.debug("Preferências encontradas para userId {}: {}", userId, preferences.size());
-        
         // Se não tem preferências, criar defaults
         if (preferences.isEmpty()) {
-            log.info("Criando preferências padrão para userId: {}", userId);
             preferences = createDefaultPreferences(userId);
         }
         

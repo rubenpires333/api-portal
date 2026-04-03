@@ -64,8 +64,6 @@ public class EmailNotificationService {
             props.put("mail.smtp.writetimeout", "5000");
             props.put("mail.debug", "false");
             
-            log.debug("JavaMailSender criado com host: {}, port: {}, username: {}", host, port, username);
-            
         } catch (Exception e) {
             log.error("Erro ao criar JavaMailSender: {}", e.getMessage());
             throw new RuntimeException("Erro ao configurar servidor de email: " + e.getMessage());
@@ -86,7 +84,6 @@ public class EmailNotificationService {
         boolean mailEnabled = platformSettingService.getBooleanSetting("mail.enabled", defaultMailEnabled);
         
         if (!mailEnabled) {
-            log.debug("Email desabilitado. Notificação não enviada para: {}", userEmail);
             return;
         }
         
@@ -108,7 +105,11 @@ public class EmailNotificationService {
             
             helper.setTo(userEmail);
             helper.setSubject(subject);
-            helper.setText(htmlContent, true);
+            
+            // Processar imagens Base64 e converter para CID (inline attachments)
+            String processedHtml = processBase64Images(htmlContent, helper);
+            
+            helper.setText(processedHtml, true);
             helper.setFrom(fromEmail, fromName);
             
             mailSender.send(message);
@@ -116,8 +117,55 @@ public class EmailNotificationService {
             log.info("Email enviado com sucesso para: {}", userEmail);
             
         } catch (Exception e) {
-            log.error("Erro ao enviar email para {}: {}", userEmail, e.getMessage(), e);
+            log.error("Erro ao enviar email para {}: {}", userEmail, e.getMessage());
             throw new RuntimeException("Erro ao enviar email: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Processar imagens Base64 no HTML e converter para anexos inline (CID)
+     */
+    private String processBase64Images(String html, MimeMessageHelper helper) {
+        if (html == null || !html.contains("data:image")) {
+            return html;
+        }
+        
+        try {
+            String processedHtml = html;
+            int imageCounter = 0;
+            
+            // Regex para encontrar imagens Base64
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                "<img[^>]+src=\"(data:image/([^;]+);base64,([^\"]+))\"[^>]*>",
+                java.util.regex.Pattern.CASE_INSENSITIVE
+            );
+            
+            java.util.regex.Matcher matcher = pattern.matcher(html);
+            
+            while (matcher.find()) {
+                String fullDataUri = matcher.group(1);
+                String imageType = matcher.group(2);
+                String base64Data = matcher.group(3);
+                
+                // Decodificar Base64
+                byte[] imageBytes = java.util.Base64.getDecoder().decode(base64Data);
+                
+                // Criar CID único
+                String cid = "image" + (++imageCounter);
+                
+                // Adicionar como anexo inline
+                helper.addInline(cid, new jakarta.mail.util.ByteArrayDataSource(imageBytes, "image/" + imageType));
+                
+                // Substituir data URI por CID
+                String cidReference = "cid:" + cid;
+                processedHtml = processedHtml.replace(fullDataUri, cidReference);
+            }
+            
+            return processedHtml;
+            
+        } catch (Exception e) {
+            log.warn("Erro ao processar imagens Base64: {}", e.getMessage());
+            return html;
         }
     }
     
