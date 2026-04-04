@@ -50,6 +50,14 @@ public class ApiResponse {
     private LocalDateTime updatedAt;
     private LocalDateTime publishedAt;
     
+    // Campos de aprovação
+    private LocalDateTime requestedApprovalAt;
+    private LocalDateTime approvedAt;
+    private String approvedBy;
+    private LocalDateTime rejectedAt;
+    private String rejectedBy;
+    private String rejectionReason;
+    
     @Data
     @Builder
     public static class CategorySummary {

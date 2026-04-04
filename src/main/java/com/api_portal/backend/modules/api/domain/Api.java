@@ -104,4 +104,18 @@ public class Api extends Auditable {
     private List<ApiVersion> versions = new ArrayList<>();
     
     private LocalDateTime publishedAt;
+    
+    // Campos de aprovação
+    private LocalDateTime requestedApprovalAt;
+    
+    private LocalDateTime approvedAt;
+    
+    private String approvedBy; // keycloakId do admin que aprovou
+    
+    private LocalDateTime rejectedAt;
+    
+    private String rejectedBy; // keycloakId do admin que rejeitou
+    
+    @Column(columnDefinition = "TEXT")
+    private String rejectionReason;
 }

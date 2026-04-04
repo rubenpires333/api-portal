@@ -9,6 +9,9 @@ public enum NotificationType {
     // API events
     API_VERSION_RELEASED,
     API_DEPRECATED,
+    API_APPROVAL_REQUESTED,
+    API_APPROVED,
+    API_REJECTED,
     
     // Rate limit events
     RATE_LIMIT_WARNING,

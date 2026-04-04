@@ -33,6 +33,7 @@ public class ApiService {
     private final ApiCategoryRepository categoryRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final com.api_portal.backend.modules.user.repository.UserRepository userRepository;
+    private final com.api_portal.backend.modules.notification.service.NotificationService notificationService;
     
     @Transactional
     public ApiResponse createApi(ApiRequest request, String providerId, String providerName, String providerEmail) {
@@ -155,7 +156,7 @@ public class ApiService {
     
     @Transactional
     public ApiResponse publishApi(UUID id, String providerId) {
-        log.info("Publicando API: {}", id);
+        log.info("Solicitando publicação da API: {}", id);
         
         Api api = apiRepository.findById(id)
             .orElseThrow(() -> new ApiException("API não encontrada"));
@@ -168,10 +169,35 @@ public class ApiService {
             throw new ApiException("API já está publicada");
         }
         
-        api.setStatus(ApiStatus.PUBLISHED);
-        api.setPublishedAt(LocalDateTime.now());
+        if (api.getStatus() == ApiStatus.PENDING_APPROVAL) {
+            throw new ApiException("API já está aguardando aprovação");
+        }
+        
+        // Mudar status para PENDING_APPROVAL ao invés de PUBLISHED
+        api.setStatus(ApiStatus.PENDING_APPROVAL);
+        api.setRequestedApprovalAt(LocalDateTime.now());
         
         api = apiRepository.save(api);
+        
+        log.info("API {} enviada para aprovação do administrador", id);
+        
+        // Notificar provider que a solicitação foi enviada
+        notificationService.sendNotification(
+            providerId,
+            api.getProviderEmail(),
+            com.api_portal.backend.modules.notification.domain.enums.NotificationType.API_APPROVAL_REQUESTED,
+            "Solicitação de Aprovação Enviada",
+            "Sua API \"" + api.getName() + "\" foi enviada para aprovação do administrador.",
+            java.util.Map.of(
+                "apiId", api.getId().toString(),
+                "apiName", api.getName(),
+                "apiSlug", api.getSlug()
+            ),
+            "/provider/my-apis"
+        );
+        
+        // Notificar todos os admins sobre nova API pendente
+        notifyAdminsAboutPendingApi(api);
         
         return mapToResponse(api);
     }
@@ -206,6 +232,106 @@ public class ApiService {
         }
         
         apiRepository.delete(api);
+    }
+    
+    /**
+     * Aprovar API (Admin)
+     */
+    @Transactional
+    public ApiResponse approveApi(UUID id, String adminId) {
+        log.info("Aprovando API: {} por admin: {}", id, adminId);
+        
+        Api api = apiRepository.findById(id)
+            .orElseThrow(() -> new ApiException("API não encontrada"));
+        
+        if (api.getStatus() != ApiStatus.PENDING_APPROVAL) {
+            throw new ApiException("Apenas APIs pendentes de aprovação podem ser aprovadas");
+        }
+        
+        api.setStatus(ApiStatus.PUBLISHED);
+        api.setApprovedAt(LocalDateTime.now());
+        api.setApprovedBy(adminId);
+        api.setPublishedAt(LocalDateTime.now());
+        
+        api = apiRepository.save(api);
+        
+        log.info("API {} aprovada e publicada com sucesso", id);
+        
+        // Notificar provider sobre aprovação
+        notificationService.sendNotification(
+            api.getProviderId(),
+            api.getProviderEmail(),
+            com.api_portal.backend.modules.notification.domain.enums.NotificationType.API_APPROVED,
+            "API Aprovada",
+            "Sua API \"" + api.getName() + "\" foi aprovada e está agora disponível no marketplace!",
+            java.util.Map.of(
+                "apiId", api.getId().toString(),
+                "apiName", api.getName(),
+                "apiSlug", api.getSlug()
+            ),
+            "/provider/my-apis"
+        );
+        
+        return mapToResponse(api);
+    }
+    
+    /**
+     * Rejeitar API (Admin)
+     */
+    @Transactional
+    public ApiResponse rejectApi(UUID id, String adminId, String reason) {
+        log.info("Rejeitando API: {} por admin: {}", id, adminId);
+        
+        Api api = apiRepository.findById(id)
+            .orElseThrow(() -> new ApiException("API não encontrada"));
+        
+        if (api.getStatus() != ApiStatus.PENDING_APPROVAL) {
+            throw new ApiException("Apenas APIs pendentes de aprovação podem ser rejeitadas");
+        }
+        
+        api.setStatus(ApiStatus.REJECTED);
+        api.setRejectedAt(LocalDateTime.now());
+        api.setRejectedBy(adminId);
+        api.setRejectionReason(reason);
+        
+        api = apiRepository.save(api);
+        
+        log.info("API {} rejeitada", id);
+        
+        // Notificar provider sobre rejeição
+        notificationService.sendNotification(
+            api.getProviderId(),
+            api.getProviderEmail(),
+            com.api_portal.backend.modules.notification.domain.enums.NotificationType.API_REJECTED,
+            "API Rejeitada",
+            "Sua API \"" + api.getName() + "\" foi rejeitada. Motivo: " + reason,
+            java.util.Map.of(
+                "apiId", api.getId().toString(),
+                "apiName", api.getName(),
+                "apiSlug", api.getSlug(),
+                "rejectionReason", reason
+            ),
+            "/provider/my-apis"
+        );
+        
+        return mapToResponse(api);
+    }
+    
+    /**
+     * Listar APIs pendentes de aprovação (Admin)
+     */
+    @Transactional(readOnly = true)
+    public Page<ApiResponse> getPendingApis(Pageable pageable) {
+        return apiRepository.findByStatus(ApiStatus.PENDING_APPROVAL, pageable)
+            .map(this::mapToResponse);
+    }
+    
+    /**
+     * Contar APIs pendentes de aprovação (Admin)
+     */
+    @Transactional(readOnly = true)
+    public long countPendingApis() {
+        return apiRepository.countByStatus(ApiStatus.PENDING_APPROVAL);
     }
     
     @Transactional(readOnly = true)
@@ -311,6 +437,12 @@ public class ApiService {
             .createdAt(api.getCreatedAt())
             .updatedAt(api.getUpdatedAt())
             .publishedAt(api.getPublishedAt())
+            .requestedApprovalAt(api.getRequestedApprovalAt())
+            .approvedAt(api.getApprovedAt())
+            .approvedBy(api.getApprovedBy())
+            .rejectedAt(api.getRejectedAt())
+            .rejectedBy(api.getRejectedBy())
+            .rejectionReason(api.getRejectionReason())
             .build();
     }
     
@@ -448,6 +580,36 @@ public class ApiService {
             .replaceAll("\\s+", "-")
             .replaceAll("-+", "-")
             .trim();
+    }
+    
+    /**
+     * Notificar todos os admins sobre nova API pendente de aprovação
+     */
+    private void notifyAdminsAboutPendingApi(Api api) {
+        try {
+            // Buscar todos os usuários com role SUPER_ADMIN
+            var admins = userRepository.findByRolesContaining("SUPER_ADMIN");
+            
+            for (var admin : admins) {
+                notificationService.sendNotification(
+                    admin.getKeycloakId(),
+                    admin.getEmail(),
+                    com.api_portal.backend.modules.notification.domain.enums.NotificationType.API_APPROVAL_REQUESTED,
+                    "Nova API Aguardando Aprovação",
+                    "A API \"" + api.getName() + "\" de " + api.getProviderName() + " está aguardando aprovação.",
+                    java.util.Map.of(
+                        "apiId", api.getId().toString(),
+                        "apiName", api.getName(),
+                        "apiSlug", api.getSlug(),
+                        "providerName", api.getProviderName()
+                    ),
+                    "/admin/apis/approvals"
+                );
+            }
+        } catch (Exception e) {
+            log.error("Erro ao notificar admins sobre API pendente: {}", e.getMessage());
+            // Não falhar a operação principal se notificação falhar
+        }
     }
     
     private ApiResponse.ProviderInfo buildProviderInfoForResponse(String keycloakId, String name, String email) {
