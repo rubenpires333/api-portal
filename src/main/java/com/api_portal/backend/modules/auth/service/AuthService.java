@@ -2,6 +2,8 @@ package com.api_portal.backend.modules.auth.service;
 
 import com.api_portal.backend.modules.auth.dto.*;
 import com.api_portal.backend.modules.auth.exception.AuthException;
+import com.api_portal.backend.modules.user.domain.User;
+import com.api_portal.backend.modules.user.repository.UserRepository;
 import com.api_portal.backend.modules.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +29,7 @@ public class AuthService {
     private final KeycloakAdminService keycloakAdminService;
     private final JwtDecoder jwtDecoder;
     private final UserService userService;
+    private final UserRepository userRepository;
     private final LoginAttemptService loginAttemptService;
     private final RecaptchaService recaptchaService;
     
@@ -101,13 +104,19 @@ public class AuthService {
                 // Login bem-sucedido - resetar tentativas
                 loginAttemptService.resetAttempts(request.getEmail(), ipAddress);
                 
-                // Extrair informações do usuário do JWT
+                // Buscar usuário do banco para obter avatarUrl
+                String keycloakId = jwt.getSubject();
+                User user = userRepository.findByKeycloakId(keycloakId)
+                    .orElseThrow(() -> new AuthException("Usuário não encontrado"));
+                
+                // Extrair informações do usuário do JWT + banco
                 userInfo = TokenResponse.UserInfo.builder()
                     .id(jwt.getSubject())
                     .email(jwt.getClaimAsString("email"))
                     .username(jwt.getClaimAsString("preferred_username"))
                     .firstName(jwt.getClaimAsString("given_name"))
                     .lastName(jwt.getClaimAsString("family_name"))
+                    .avatarUrl(user.getAvatarUrl())
                     .roles(extractRoles(jwt))
                     .permissions(new ArrayList<>())
                     .build();
@@ -243,13 +252,19 @@ public class AuthService {
                 // Sincronizar e validar usuário (lança exceção se inativo)
                 syncUserFromJwt(jwt, ipAddress);
                 
-                // Extrair informações do usuário do JWT
+                // Buscar usuário do banco para obter avatarUrl
+                String keycloakId = jwt.getSubject();
+                User user = userRepository.findByKeycloakId(keycloakId)
+                    .orElseThrow(() -> new AuthException("Usuário não encontrado"));
+                
+                // Extrair informações do usuário do JWT + banco
                 userInfo = TokenResponse.UserInfo.builder()
                     .id(jwt.getSubject())
                     .email(jwt.getClaimAsString("email"))
                     .username(jwt.getClaimAsString("preferred_username"))
                     .firstName(jwt.getClaimAsString("given_name"))
                     .lastName(jwt.getClaimAsString("family_name"))
+                    .avatarUrl(user.getAvatarUrl())
                     .roles(extractRoles(jwt))
                     .permissions(new ArrayList<>())
                     .build();
