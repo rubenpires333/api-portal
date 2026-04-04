@@ -23,5 +23,8 @@ public enum NotificationType {
     
     // Billing events (future)
     PAYMENT_REQUIRED,
-    PAYMENT_RECEIVED
+    PAYMENT_RECEIVED,
+    WITHDRAWAL_REQUESTED,
+    WITHDRAWAL_APPROVED,
+    WITHDRAWAL_REJECTED
 }

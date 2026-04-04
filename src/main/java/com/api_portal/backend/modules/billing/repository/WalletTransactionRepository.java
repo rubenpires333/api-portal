@@ -20,4 +20,7 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
     
     @Query("SELECT t FROM WalletTransaction t WHERE t.status = :status AND t.availableAt <= :now")
     List<WalletTransaction> findPendingTransactionsReadyForRelease(TransactionStatus status, LocalDateTime now);
+    
+    @Query("SELECT t FROM WalletTransaction t WHERE t.wallet = :wallet AND t.referenceId = :referenceId")
+    java.util.Optional<WalletTransaction> findByWalletAndReferenceId(ProviderWallet wallet, UUID referenceId);
 }

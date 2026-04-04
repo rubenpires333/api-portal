@@ -2,6 +2,7 @@ package com.api_portal.backend.modules.billing.model;
 
 import com.api_portal.backend.modules.billing.model.enums.WithdrawalMethod;
 import com.api_portal.backend.modules.billing.model.enums.WithdrawalStatus;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,6 +27,7 @@ public class WithdrawalRequest {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "wallet_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private ProviderWallet wallet;
 
     @Column(nullable = false, precision = 15, scale = 2)

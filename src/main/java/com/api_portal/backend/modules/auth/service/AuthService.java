@@ -111,7 +111,7 @@ public class AuthService {
                 
                 // Extrair informações do usuário do JWT + banco
                 userInfo = TokenResponse.UserInfo.builder()
-                    .id(jwt.getSubject())
+                    .id(user.getId().toString()) // Usar ID da tabela users, não keycloak_id
                     .email(jwt.getClaimAsString("email"))
                     .username(jwt.getClaimAsString("preferred_username"))
                     .firstName(jwt.getClaimAsString("given_name"))
@@ -259,7 +259,7 @@ public class AuthService {
                 
                 // Extrair informações do usuário do JWT + banco
                 userInfo = TokenResponse.UserInfo.builder()
-                    .id(jwt.getSubject())
+                    .id(user.getId().toString()) // Usar ID da tabela users, não keycloak_id
                     .email(jwt.getClaimAsString("email"))
                     .username(jwt.getClaimAsString("preferred_username"))
                     .firstName(jwt.getClaimAsString("given_name"))

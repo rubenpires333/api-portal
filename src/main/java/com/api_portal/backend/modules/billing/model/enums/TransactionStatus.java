@@ -5,5 +5,6 @@ public enum TransactionStatus {
     AVAILABLE,  // Disponível para levantamento
     RESERVED,   // Reservado para levantamento em curso
     DEBITED,    // Já debitado (levantamento concluído)
+    COMPLETED,  // Transação completada (levantamento aprovado)
     CANCELLED   // Cancelado
 }

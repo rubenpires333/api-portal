@@ -58,7 +58,7 @@ CREATE TABLE provider_wallets (
     pending_balance DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     reserved_balance DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     lifetime_earned DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+    currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
     preferred_method VARCHAR(50),
     payout_details TEXT,
     minimum_payout DECIMAL(10,2) DEFAULT 10.00,

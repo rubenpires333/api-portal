@@ -44,7 +44,7 @@ public class ProviderWallet {
 
     @Column(nullable = false, length = 3)
     @Builder.Default
-    private String currency = "USD";
+    private String currency = "EUR";
 
     // Preferências de levantamento
     @Enumerated(EnumType.STRING)

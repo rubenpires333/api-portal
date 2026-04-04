@@ -1,6 +1,7 @@
 package com.api_portal.backend.modules.billing.controller;
 
 import com.api_portal.backend.modules.billing.dto.WithdrawalRequestDTO;
+import com.api_portal.backend.modules.billing.dto.WithdrawalRequestResponse;
 import com.api_portal.backend.modules.billing.model.WithdrawalRequest;
 import com.api_portal.backend.modules.billing.service.WithdrawalService;
 import com.api_portal.backend.shared.security.RequiresPermission;
@@ -10,17 +11,18 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/provider/wallet")
 @RequiredArgsConstructor
-@RequiresPermission("wallet.withdraw")
 public class WithdrawalController {
 
     private final WithdrawalService withdrawalService;
 
     @PostMapping("/withdraw")
+    @RequiresPermission("wallet.withdraw")
     public ResponseEntity<WithdrawalRequest> requestWithdrawal(
             @RequestParam UUID providerId,
             @RequestBody WithdrawalRequestDTO dto) {
@@ -29,15 +31,33 @@ public class WithdrawalController {
         return ResponseEntity.ok(request);
     }
 
+    @GetMapping("/withdrawals")
+    @RequiresPermission("wallet.withdraw")
+    public ResponseEntity<Page<WithdrawalRequestResponse>> getMyWithdrawals(
+            @RequestParam UUID providerId,
+            Pageable pageable) {
+        
+        Page<WithdrawalRequestResponse> requests = withdrawalService.getProviderWithdrawals(providerId, pageable);
+        return ResponseEntity.ok(requests);
+    }
+
     @GetMapping("/withdraw/{id}")
-    public ResponseEntity<WithdrawalRequest> getWithdrawalStatus(@PathVariable UUID id) {
-        // TODO: Implementar busca por ID
-        return ResponseEntity.notFound().build();
+    @RequiresPermission("wallet.withdraw")
+    public ResponseEntity<WithdrawalRequest> getWithdrawalStatus(
+            @PathVariable UUID id,
+            @RequestParam UUID providerId) {
+        
+        WithdrawalRequest request = withdrawalService.getWithdrawalById(id, providerId);
+        return ResponseEntity.ok(request);
     }
 
     @DeleteMapping("/withdraw/{id}")
-    public ResponseEntity<Void> cancelWithdrawal(@PathVariable UUID id) {
-        // TODO: Implementar cancelamento
+    @RequiresPermission("wallet.withdraw")
+    public ResponseEntity<Void> cancelWithdrawal(
+            @PathVariable UUID id,
+            @RequestParam UUID providerId) {
+        
+        withdrawalService.cancelWithdrawal(id, providerId);
         return ResponseEntity.noContent().build();
     }
 }
@@ -51,15 +71,27 @@ class AdminWithdrawalController {
     private final WithdrawalService withdrawalService;
 
     @GetMapping
-    public ResponseEntity<Page<WithdrawalRequest>> getPendingWithdrawals(Pageable pageable) {
-        Page<WithdrawalRequest> requests = withdrawalService.getPendingWithdrawals(pageable);
+    public ResponseEntity<Page<WithdrawalRequestResponse>> getAllWithdrawals(Pageable pageable) {
+        Page<WithdrawalRequestResponse> requests = withdrawalService.getAllWithdrawals(pageable);
         return ResponseEntity.ok(requests);
+    }
+
+    @GetMapping("/pending")
+    public ResponseEntity<Page<WithdrawalRequestResponse>> getPendingWithdrawals(Pageable pageable) {
+        Page<WithdrawalRequestResponse> requests = withdrawalService.getPendingWithdrawals(pageable);
+        return ResponseEntity.ok(requests);
+    }
+
+    @GetMapping("/pending/count")
+    public ResponseEntity<Map<String, Long>> getPendingCount() {
+        long count = withdrawalService.countPendingWithdrawals();
+        return ResponseEntity.ok(Map.of("count", count));
     }
 
     @PostMapping("/{id}/approve")
     public ResponseEntity<Void> approveWithdrawal(
             @PathVariable UUID id,
-            @RequestParam UUID adminId) {
+            @RequestParam UUID adminId) { 
         
         withdrawalService.approveWithdrawal(id, adminId);
         return ResponseEntity.ok().build();
