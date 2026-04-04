@@ -173,6 +173,24 @@
             <artifactId>httpclient5</artifactId>
         </dependency>
 
+        <!-- ══════════════════════════════════════════════════════
+             BILLING MODULE — Stripe & Payment Processing
+        ═══════════════════════════════════════════════════════ -->
+        
+        <!-- Stripe Java SDK -->
+        <dependency>
+            <groupId>com.stripe</groupId>
+            <artifactId>stripe-java</artifactId>
+            <version>24.0.0</version>
+        </dependency>
+
+        <!-- Jasypt para encriptação de dados sensíveis -->
+        <dependency>
+            <groupId>com.github.ulisesbocchio</groupId>
+            <artifactId>jasypt-spring-boot-starter</artifactId>
+            <version>3.0.5</version>
+        </dependency>
+
     </dependencies>
 
     <!-- ============================================================

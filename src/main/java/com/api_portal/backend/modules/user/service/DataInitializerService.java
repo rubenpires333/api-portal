@@ -117,7 +117,7 @@ public class DataInitializerService implements CommandLineRunner {
         if (!roleRepository.existsByCode("PROVIDER")) {
             Set<Permission> providerPerms = getPermissionsByCode(allPermissions,
                 "api.create", "api.read", "api.update", "api.delete", "api.publish",
-                "category.read", "user.read", "provider.metrics.read"
+                "category.read", "user.read", "provider.metrics.read", "wallet.withdraw"
             );
             
             Role provider = Role.builder()
@@ -299,6 +299,16 @@ public class DataInitializerService implements CommandLineRunner {
         permissions.add(new PermissionData(
             "Ler Métricas do Consumer", "consumer.metrics.read", 
             "Permite visualizar métricas de uso das APIs", "consumer", "metrics.read"
+        ));
+        
+        // Permissões de Billing
+        permissions.add(new PermissionData(
+            "Gerenciar Billing", "billing.manage", 
+            "Permite gerenciar gateways de pagamento, planos e regras de taxas", "billing", "manage"
+        ));
+        permissions.add(new PermissionData(
+            "Sacar Fundos", "wallet.withdraw", 
+            "Permite solicitar saques da carteira", "wallet", "withdraw"
         ));
         
         return permissions;

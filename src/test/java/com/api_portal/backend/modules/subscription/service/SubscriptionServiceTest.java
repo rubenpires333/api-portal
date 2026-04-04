@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 
@@ -34,6 +35,9 @@ class SubscriptionServiceTest {
     private ApiRepository apiRepository;
     
     @Mock
+    private ApplicationEventPublisher eventPublisher;
+    
+    @Mock
     private Authentication authentication;
     
     @Mock
@@ -44,10 +48,13 @@ class SubscriptionServiceTest {
     
     private Api testApi;
     private UUID apiId;
+    private UUID testConsumerId;
     
     @BeforeEach
     void setUp() {
         apiId = UUID.randomUUID();
+        testConsumerId = UUID.randomUUID();
+        
         testApi = Api.builder()
             .id(apiId)
             .name("Test API")
@@ -64,10 +71,8 @@ class SubscriptionServiceTest {
         request.setApiId(apiId);
         request.setNotes("Test subscription");
         
-        UUID testConsumerId = UUID.randomUUID();
-        
         when(authentication.getPrincipal()).thenReturn(jwt);
-        when(jwt.getSubject()).thenReturn(testConsumerId.toString()); // Retorna String do UUID
+        when(jwt.getSubject()).thenReturn(testConsumerId.toString());
         when(jwt.getClaimAsString("email")).thenReturn("consumer@test.com");
         when(jwt.getClaimAsString("name")).thenReturn("Test Consumer");
         
@@ -79,7 +84,7 @@ class SubscriptionServiceTest {
         Subscription savedSubscription = Subscription.builder()
             .id(UUID.randomUUID())
             .api(testApi)
-            .consumerId(testConsumerId) // Usar UUID
+            .consumerId(testConsumerId)
             .consumerEmail("consumer@test.com")
             .status(SubscriptionStatus.ACTIVE)
             .apiKey("apk_test123")
@@ -96,6 +101,7 @@ class SubscriptionServiceTest {
         assertEquals("consumer@test.com", response.getConsumerEmail());
         assertEquals(SubscriptionStatus.ACTIVE, response.getStatus());
         verify(subscriptionRepository, times(1)).save(any(Subscription.class));
+        verify(eventPublisher, times(1)).publishEvent(any());
     }
     
     @Test
@@ -105,13 +111,16 @@ class SubscriptionServiceTest {
         request.setApiId(apiId);
         
         when(authentication.getPrincipal()).thenReturn(jwt);
-        when(jwt.getSubject()).thenReturn("consumer-123");
+        when(jwt.getSubject()).thenReturn(testConsumerId.toString());
         when(apiRepository.findById(apiId)).thenReturn(Optional.empty());
         
         // Act & Assert
         assertThrows(IllegalArgumentException.class, () -> {
             subscriptionService.subscribe(request, authentication);
         });
+        
+        // Verify que não tentou salvar
+        verify(subscriptionRepository, never()).save(any());
     }
     
     @Test
@@ -122,13 +131,16 @@ class SubscriptionServiceTest {
         request.setApiId(apiId);
         
         when(authentication.getPrincipal()).thenReturn(jwt);
-        when(jwt.getSubject()).thenReturn("consumer-123");
+        when(jwt.getSubject()).thenReturn(testConsumerId.toString());
         when(apiRepository.findById(apiId)).thenReturn(Optional.of(testApi));
         
         // Act & Assert
-        assertThrows(IllegalStateException.class, () -> {
+        assertThrows(IllegalArgumentException.class, () -> {
             subscriptionService.subscribe(request, authentication);
         });
+        
+        // Verify que não tentou salvar
+        verify(subscriptionRepository, never()).save(any());
     }
     
     @Test

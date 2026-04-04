@@ -1,0 +1,521 @@
+{
+  "info": {
+    "name": "API Portal - Billing Admin",
+    "description": "Collection for testing billing administration endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login as SuperAdmin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('token', jsonData.accessToken);",
+                  "    pm.collectionVariables.set('adminId', jsonData.userId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"superadmin@example.com\",\n  \"password\": \"sua_senha\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gateway Management",
+      "item": [
+        {
+          "name": "Create Stripe Gateway",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gatewayType\": \"STRIPE\",\n  \"apiKey\": \"pk_test_51TIH8ABMB0oMkxTZx6YU0xWj5Ug8mZc0Xzc99TrclcISbhJVb44X3m0WjykYOcWbsrhQk9JmCyrZnmqTZMEyabQL00LjQt0QbH\",\n  \"webhookSecret\": \"whsec_2b770bb9c33f17af6061c2560ac23748941df2583b7c86ed1eec18b5ea302391\",\n  \"active\": true,\n  \"testMode\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/gateways",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "gateways"]
+            }
+          }
+        },
+        {
+          "name": "Get All Gateways",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/gateways",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "gateways"]
+            }
+          }
+        },
+        {
+          "name": "Get Active Gateway",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/gateways/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "gateways", "active"]
+            }
+          }
+        },
+        {
+          "name": "Activate Stripe Gateway",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/gateways/STRIPE/activate",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "gateways", "STRIPE", "activate"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Plan Management",
+      "item": [
+        {
+          "name": "Create Starter Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"STARTER\",\n  \"displayName\": \"Starter Plan\",\n  \"description\": \"Perfect for testing and small projects\",\n  \"monthlyPrice\": 0.00,\n  \"currency\": \"USD\",\n  \"maxApis\": 3,\n  \"maxRequestsPerMonth\": 10000,\n  \"maxTeamMembers\": 1,\n  \"customDomain\": false,\n  \"prioritySupport\": false,\n  \"advancedAnalytics\": false,\n  \"stripePriceId\": \"price_starter\",\n  \"vinti4PriceId\": null,\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "plans"]
+            }
+          }
+        },
+        {
+          "name": "Create Growth Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"GROWTH\",\n  \"displayName\": \"Growth Plan\",\n  \"description\": \"For growing businesses and teams\",\n  \"monthlyPrice\": 49.00,\n  \"currency\": \"USD\",\n  \"maxApis\": 10,\n  \"maxRequestsPerMonth\": 100000,\n  \"maxTeamMembers\": 5,\n  \"customDomain\": true,\n  \"prioritySupport\": true,\n  \"advancedAnalytics\": true,\n  \"stripePriceId\": \"price_growth\",\n  \"vinti4PriceId\": null,\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "plans"]
+            }
+          }
+        },
+        {
+          "name": "Create Business Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"BUSINESS\",\n  \"displayName\": \"Business Plan\",\n  \"description\": \"Enterprise-grade features and support\",\n  \"monthlyPrice\": 149.00,\n  \"currency\": \"USD\",\n  \"maxApis\": -1,\n  \"maxRequestsPerMonth\": -1,\n  \"maxTeamMembers\": -1,\n  \"customDomain\": true,\n  \"prioritySupport\": true,\n  \"advancedAnalytics\": true,\n  \"stripePriceId\": \"price_business\",\n  \"vinti4PriceId\": null,\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "plans"]
+            }
+          }
+        },
+        {
+          "name": "Get All Plans",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "plans"]
+            }
+          }
+        },
+        {
+          "name": "Get Active Plans",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/plans/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "plans", "active"]
+            }
+          }
+        },
+        {
+          "name": "Toggle Plan Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/plans/:planId/toggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "plans", ":planId", "toggle"],
+              "variable": [
+                {
+                  "key": "planId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fee Rule Management",
+      "item": [
+        {
+          "name": "Create Bank Transfer Fee Rule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"withdrawalMethod\": \"BANK_TRANSFER\",\n  \"fixedFee\": 2.50,\n  \"percentageFee\": 1.00,\n  \"minAmount\": 10.00,\n  \"maxAmount\": 10000.00,\n  \"currency\": \"USD\",\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/fee-rules?adminId={{adminId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "fee-rules"],
+              "query": [
+                {
+                  "key": "adminId",
+                  "value": "{{adminId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create PayPal Fee Rule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"withdrawalMethod\": \"PAYPAL\",\n  \"fixedFee\": 0.50,\n  \"percentageFee\": 2.50,\n  \"minAmount\": 5.00,\n  \"maxAmount\": 5000.00,\n  \"currency\": \"USD\",\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/fee-rules?adminId={{adminId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "fee-rules"],
+              "query": [
+                {
+                  "key": "adminId",
+                  "value": "{{adminId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Stripe Connect Fee Rule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"withdrawalMethod\": \"STRIPE_CONNECT\",\n  \"fixedFee\": 0.00,\n  \"percentageFee\": 0.25,\n  \"minAmount\": 1.00,\n  \"maxAmount\": 50000.00,\n  \"currency\": \"USD\",\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/fee-rules?adminId={{adminId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "fee-rules"],
+              "query": [
+                {
+                  "key": "adminId",
+                  "value": "{{adminId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Fee Rules",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/fee-rules",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "fee-rules"]
+            }
+          }
+        },
+        {
+          "name": "Toggle Fee Rule Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/billing/fee-rules/:ruleId/toggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "billing", "fee-rules", ":ruleId", "toggle"],
+              "variable": [
+                {
+                  "key": "ruleId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Checkout & Billing",
+      "item": [
+        {
+          "name": "Create Checkout Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planName\": \"GROWTH\",\n  \"successUrl\": \"http://localhost:4200/billing/success\",\n  \"cancelUrl\": \"http://localhost:4200/billing/cancel\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/billing/checkout",
+              "host": ["{{baseUrl}}"],
+              "path": ["billing", "checkout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wallet",
+      "item": [
+        {
+          "name": "Get Wallet Balance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/balance",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallet", "balance"]
+            }
+          }
+        },
+        {
+          "name": "Get Wallet Transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallet", "transactions"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Withdrawals",
+      "item": [
+        {
+          "name": "Request Withdrawal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 30.00,\n  \"withdrawalMethod\": \"PAYPAL\",\n  \"destinationAccount\": \"provider@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/withdrawals/request",
+              "host": ["{{baseUrl}}"],
+              "path": ["withdrawals", "request"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
