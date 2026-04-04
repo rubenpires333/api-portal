@@ -5,8 +5,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface TermsAndPoliciesRepository extends JpaRepository<TermsAndPolicies, Long> {
+public interface TermsAndPoliciesRepository extends JpaRepository<TermsAndPolicies, UUID> {
     Optional<TermsAndPolicies> findFirstByIsActiveTrueOrderByCreatedAtDesc();
 }
