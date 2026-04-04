@@ -50,6 +50,11 @@ public class WithdrawalFeeRule {
 
     private UUID updatedBy;
 
+    @PrePersist
+    protected void onCreate() {
+        updatedAt = LocalDateTime.now();
+    }
+
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
