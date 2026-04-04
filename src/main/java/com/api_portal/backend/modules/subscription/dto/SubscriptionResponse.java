@@ -21,7 +21,8 @@ public class SubscriptionResponse {
     private String apiName;
     private String apiSlug;
     private String apiVersion;
-    private String consumerId;
+    private String consumerId; // keycloakId do consumer
+    private UUID userConsumerId; // id da tabela users
     private String consumerEmail;
     private String consumerName;
     private SubscriptionStatus status;

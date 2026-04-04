@@ -12,6 +12,8 @@ import com.api_portal.backend.modules.subscription.domain.repository.Subscriptio
 import com.api_portal.backend.modules.subscription.dto.RevokeRequest;
 import com.api_portal.backend.modules.subscription.dto.SubscriptionRequest;
 import com.api_portal.backend.modules.subscription.dto.SubscriptionResponse;
+import com.api_portal.backend.modules.user.domain.User;
+import com.api_portal.backend.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -35,6 +37,7 @@ public class SubscriptionService {
     
     private final SubscriptionRepository subscriptionRepository;
     private final ApiRepository apiRepository;
+    private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
     
     /**
@@ -385,6 +388,18 @@ public class SubscriptionService {
                 .orElse("N/A");
         }
         
+        // Buscar id da tabela users pelo keycloakId
+        UUID userConsumerId = null;
+        try {
+            User consumer = userRepository.findByKeycloakId(subscription.getConsumerId().toString())
+                .orElse(null);
+            if (consumer != null) {
+                userConsumerId = consumer.getId();
+            }
+        } catch (Exception e) {
+            log.warn("Não foi possível buscar user id para consumerId: {}", subscription.getConsumerId());
+        }
+        
         return SubscriptionResponse.builder()
             .id(subscription.getId())
             .apiId(subscription.getApi().getId())
@@ -392,7 +407,8 @@ public class SubscriptionService {
             .apiName(subscription.getApi().getName())
             .apiSlug(subscription.getApi().getSlug())
             .apiVersion(apiVersion)
-            .consumerId(subscription.getConsumerId().toString()) // Converter UUID para String
+            .consumerId(subscription.getConsumerId().toString()) // keycloakId
+            .userConsumerId(userConsumerId) // id da tabela users
             .consumerEmail(subscription.getConsumerEmail())
             .consumerName(subscription.getConsumerName())
             .status(subscription.getStatus())

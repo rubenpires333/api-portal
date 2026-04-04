@@ -183,7 +183,7 @@ public class UserService {
     @Transactional(readOnly = true)
     public UserResponse getUserById(UUID id) {
         User user = userRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+            .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
         
         return mapToResponse(user);
     }
