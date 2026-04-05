@@ -122,6 +122,22 @@ public class WebhookController {
                 }
             }
 
+            // FASE 3.1: Processar invoice.payment_succeeded (Subscriptions sem Payment Intent - free/trial)
+            if (eventType.equals("invoice.payment_succeeded")) {
+                // Tentar processar como nova subscrição de plataforma (sem Payment Intent)
+                log.info("Tentando processar invoice.payment_succeeded como nova subscrição de plataforma");
+                try {
+                    checkoutWebhookService.processInvoicePaymentSucceeded(event);
+                    webhook.setProcessed(true);
+                    webhookRepository.save(webhook);
+                    log.info("✅ Invoice payment succeeded processado como nova subscrição de plataforma");
+                    return;
+                } catch (IllegalStateException e) {
+                    // Não é nova subscrição, pode ser renovação automática
+                    log.info("Invoice não é nova subscrição, pode ser renovação automática ou API payment");
+                }
+            }
+
             // Verificar se é evento de plataforma (tem planId no metadata)
             boolean isPlatformSubscription = event.getMetadata() != null && 
                 event.getMetadata().containsKey("planId");
@@ -131,8 +147,17 @@ public class WebhookController {
             if (isPlatformSubscription) {
                 log.info("Processing as PLATFORM subscription event");
                 if (eventType.contains("invoice.payment_succeeded")) {
-                    log.info("Calling platformSubscriptionService.createOrUpdateSubscription()");
+                    log.info("Calling platformSubscriptionService.createOrUpdateSubscription() - Renovação automática");
                     platformSubscriptionService.createOrUpdateSubscription(event);
+                } else if (eventType.contains("invoice.payment_failed")) {
+                    log.info("Processando falha de pagamento de subscrição");
+                    platformSubscriptionService.handlePaymentFailed(event);
+                } else if (eventType.contains("customer.subscription.updated")) {
+                    log.info("Processando atualização de subscrição");
+                    platformSubscriptionService.handleSubscriptionUpdated(event);
+                } else if (eventType.contains("customer.subscription.deleted")) {
+                    log.info("Processando cancelamento de subscrição");
+                    platformSubscriptionService.handleSubscriptionDeleted(event);
                 } else {
                     log.info("Event type not handled for platform subscription: {}", eventType);
                 }

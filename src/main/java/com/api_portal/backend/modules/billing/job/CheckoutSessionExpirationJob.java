@@ -16,7 +16,7 @@ public class CheckoutSessionExpirationJob {
 
     private final CheckoutService checkoutService;
 
-    @Scheduled(cron = "0 */5 * * * *") // A cada 5 minutos
+    @Scheduled(cron = "0 0 * * * *") // A cada 5 minutos
     public void expireOldSessions() {
         log.debug("Executando job de expiração de sessões de checkout");
         checkoutService.expireOldSessions();

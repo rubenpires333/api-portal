@@ -21,9 +21,12 @@ public enum NotificationType {
     API_MAINTENANCE,
     API_INCIDENT,
     
-    // Billing events (future)
+    // Billing events
     PAYMENT_REQUIRED,
     PAYMENT_RECEIVED,
+    PAYMENT_FAILED,
+    SUBSCRIPTION_CANCELED,
+    SUBSCRIPTION_RENEWED,
     WITHDRAWAL_REQUESTED,
     WITHDRAWAL_APPROVED,
     WITHDRAWAL_REJECTED,

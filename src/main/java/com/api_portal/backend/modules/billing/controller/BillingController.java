@@ -133,4 +133,20 @@ public class BillingController {
         checkoutService.cancelCheckoutSession(sessionId);
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/subscription/change-plan")
+    public ResponseEntity<com.api_portal.backend.modules.billing.dto.UpgradeDowngradeResponse> changePlan(
+            @RequestBody com.api_portal.backend.modules.billing.dto.UpgradeDowngradeRequest request) {
+        
+        log.info("Change plan request: providerId={}, newPlan={}", 
+            request.getProviderId(), request.getNewPlanName());
+        
+        com.api_portal.backend.modules.billing.dto.UpgradeDowngradeResponse response = 
+            platformSubscriptionService.upgradeOrDowngradePlan(
+                request.getProviderId(), 
+                request.getNewPlanName()
+            );
+        
+        return ResponseEntity.ok(response);
+    }
 }

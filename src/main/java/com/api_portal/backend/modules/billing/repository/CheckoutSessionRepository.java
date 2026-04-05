@@ -17,6 +17,8 @@ public interface CheckoutSessionRepository extends JpaRepository<CheckoutSession
     
     Optional<CheckoutSession> findByStripePaymentIntentId(String stripePaymentIntentId);
     
+    Optional<CheckoutSession> findByStripeSubscriptionId(String stripeSubscriptionId);
+    
     List<CheckoutSession> findByStatusAndCreatedAtBefore(CheckoutSessionStatus status, LocalDateTime createdBefore);
     
     List<CheckoutSession> findByProviderIdOrderByCreatedAtDesc(UUID providerId);

@@ -136,11 +136,174 @@ public class StripeGateway implements PaymentGateway {
         return GatewayMetadata.builder()
             .displayName("Stripe")
             .logoUrl("https://stripe.com/img/v3/home/social.png")
-            .supportedCurrencies(Arrays.asList("USD", "EUR", "GBP", "BRL", "CVE"))
+            .supportedCurrencies(Arrays.asList("USD", "EUR", "GBP", "BRL"))  // CVE removido - não suportado
             .supportsSubscriptions(true)
             .supportsRefunds(true)
             .supportsWebhooks(true)
             .build();
+    }
+
+    /**
+     * Criar Subscription com Setup Intent para pagamento embutido
+     * Este método cria um customer e uma subscription, retornando o client secret
+     * para confirmar o pagamento no frontend
+     */
+    public Map<String, String> createSubscriptionWithSetupIntent(String priceId, Map<String, String> metadata) {
+        if (apiKey != null && !apiKey.isEmpty()) {
+            Stripe.apiKey = apiKey;
+            log.info("✅ Stripe API key set for Subscription creation");
+        } else {
+            log.error("❌ Stripe API key is NULL or EMPTY");
+            throw new RuntimeException("Stripe API key not configured");
+        }
+
+        try {
+            log.info("Creating Stripe Subscription with Payment Intent: priceId={}, metadata={}", priceId, metadata);
+
+            // VALIDAÇÃO: Buscar e verificar o Price antes de criar a subscription
+            try {
+                com.stripe.model.Price price = com.stripe.model.Price.retrieve(priceId);
+                log.info("📋 Price Details from Stripe:");
+                log.info("  - ID: {}", price.getId());
+                log.info("  - Active: {}", price.getActive());
+                log.info("  - Currency: {}", price.getCurrency());
+                log.info("  - Unit Amount: {} (in cents)", price.getUnitAmount());
+                log.info("  - Type: {}", price.getType());
+                if (price.getRecurring() != null) {
+                    log.info("  - Recurring Interval: {}", price.getRecurring().getInterval());
+                    log.info("  - Trial Period Days: {}", price.getRecurring().getTrialPeriodDays());
+                }
+                
+                // VALIDAÇÃO CRÍTICA: Verificar se o preço é > 0
+                if (price.getUnitAmount() == null || price.getUnitAmount() == 0) {
+                    log.warn("⚠️ Price {} has unit_amount = 0! This will create a free subscription.", priceId);
+                }
+                
+                // VALIDAÇÃO CRÍTICA: Verificar moeda suportada
+                String currency = price.getCurrency().toLowerCase();
+                if ("cve".equals(currency)) {
+                    log.error("❌ Currency CVE (Cabo Verde Escudo) is NOT supported by Stripe for subscriptions!");
+                    log.error("   Supported currencies: EUR, USD, GBP, BRL, etc.");
+                    log.error("   Please create a new Price with EUR or USD currency.");
+                    throw new RuntimeException(
+                        "Currency CVE is not supported for subscriptions. " +
+                        "Please create a new Price ID with EUR or USD currency in Stripe Dashboard."
+                    );
+                }
+            } catch (RuntimeException e) {
+                // Re-throw validation errors
+                throw e;
+            } catch (Exception e) {
+                log.error("❌ Failed to retrieve Price details: {}", e.getMessage());
+            }
+
+            // 1. Criar Customer
+            Map<String, Object> customerParams = new HashMap<>();
+            if (metadata != null && !metadata.isEmpty()) {
+                customerParams.put("metadata", metadata);
+            }
+            
+            com.stripe.model.Customer customer = com.stripe.model.Customer.create(customerParams);
+            log.info("✅ Customer created: id={}", customer.getId());
+
+            // 2. Criar Subscription com payment_behavior='default_incomplete' e expand
+            Map<String, Object> subscriptionParams = new HashMap<>();
+            subscriptionParams.put("customer", customer.getId());
+            subscriptionParams.put("items", Arrays.asList(
+                Map.of("price", priceId)
+            ));
+            subscriptionParams.put("payment_behavior", "default_incomplete");
+            subscriptionParams.put("payment_settings", Map.of(
+                "save_default_payment_method", "on_subscription",
+                "payment_method_types", Arrays.asList("card")
+            ));
+            // CRÍTICO: Expandir latest_invoice.payment_intent para garantir que vem no response
+            subscriptionParams.put("expand", Arrays.asList("latest_invoice.payment_intent"));
+            
+            if (metadata != null && !metadata.isEmpty()) {
+                subscriptionParams.put("metadata", metadata);
+            }
+
+            com.stripe.model.Subscription subscription = com.stripe.model.Subscription.create(subscriptionParams);
+            log.info("✅ Subscription created: id={}, status={}", subscription.getId(), subscription.getStatus());
+
+            // 3. Extrair Payment Intent da invoice
+            com.stripe.model.Invoice latestInvoice = subscription.getLatestInvoiceObject();
+            if (latestInvoice == null) {
+                log.error("❌ Latest invoice is NULL - subscription: {}", subscription.getId());
+                log.error("Subscription status: {}, latest_invoice ID: {}", 
+                    subscription.getStatus(), subscription.getLatestInvoice());
+                    
+                // Tentar buscar invoice manualmente
+                if (subscription.getLatestInvoice() != null) {
+                    log.info("Tentando buscar invoice manualmente: {}", subscription.getLatestInvoice());
+                    latestInvoice = com.stripe.model.Invoice.retrieve(subscription.getLatestInvoice());
+                } else {
+                    throw new RuntimeException("Failed to get latest invoice from subscription - no invoice ID");
+                }
+            }
+            
+            // LOGS DETALHADOS DA INVOICE
+            log.info("📋 Invoice Details:");
+            log.info("  - ID: {}", latestInvoice.getId());
+            log.info("  - Status: {}", latestInvoice.getStatus());
+            log.info("  - Amount Due: {}", latestInvoice.getAmountDue());
+            log.info("  - Amount Paid: {}", latestInvoice.getAmountPaid());
+            log.info("  - Amount Remaining: {}", latestInvoice.getAmountRemaining());
+            log.info("  - Payment Intent ID: {}", latestInvoice.getPaymentIntent());
+            log.info("  - Paid: {}", latestInvoice.getPaid());
+            
+            com.stripe.model.PaymentIntent paymentIntent = latestInvoice.getPaymentIntentObject();
+            if (paymentIntent == null && latestInvoice.getPaymentIntent() != null) {
+                // Buscar Payment Intent manualmente
+                log.info("Payment Intent não expandido, buscando manualmente: {}", latestInvoice.getPaymentIntent());
+                paymentIntent = com.stripe.model.PaymentIntent.retrieve(latestInvoice.getPaymentIntent());
+            }
+            
+            // CASO ESPECIAL: Invoice sem Payment Intent (valor 0 ou já paga)
+            if (paymentIntent == null) {
+                log.warn("⚠️ Payment Intent is NULL in invoice: {}", latestInvoice.getId());
+                
+                // Se invoice tem amount_due = 0, não precisa de Payment Intent
+                if (latestInvoice.getAmountDue() == 0) {
+                    log.info("✅ Invoice has amount_due = 0, no payment needed. Subscription is active.");
+                    
+                    // Retornar sem clientSecret - subscription já está ativa
+                    Map<String, String> result = new HashMap<>();
+                    result.put("clientSecret", null); // Sem Payment Intent
+                    result.put("subscriptionId", subscription.getId());
+                    result.put("customerId", customer.getId());
+                    result.put("paymentIntentId", null);
+                    result.put("status", "active"); // Subscription já ativa
+                    
+                    log.info("✅ Subscription created without payment (free or trial)");
+                    return result;
+                }
+                
+                // Se invoice tem amount_due > 0 mas não tem Payment Intent, é erro
+                log.error("❌ Invoice has amount_due > 0 but no Payment Intent!");
+                log.error("Invoice status: {}, amount_due: {}, amount_paid: {}", 
+                    latestInvoice.getStatus(), latestInvoice.getAmountDue(), latestInvoice.getAmountPaid());
+                throw new RuntimeException("Failed to get payment intent from invoice - invoice has amount due but no payment intent");
+            }
+            
+            log.info("✅ Payment Intent from subscription: id={}, status={}, clientSecret={}", 
+                paymentIntent.getId(), paymentIntent.getStatus(), 
+                paymentIntent.getClientSecret() != null ? "present" : "null");
+
+            Map<String, String> result = new HashMap<>();
+            result.put("clientSecret", paymentIntent.getClientSecret());
+            result.put("subscriptionId", subscription.getId());
+            result.put("customerId", customer.getId());
+            result.put("paymentIntentId", paymentIntent.getId());
+            
+            log.info("✅ Subscription with Payment Intent created successfully");
+            return result;
+
+        } catch (StripeException e) {
+            log.error("❌ Error creating Subscription with Payment Intent", e);
+            throw new RuntimeException("Failed to create Subscription: " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -233,6 +396,20 @@ public class StripeGateway implements PaymentGateway {
                     }
                     break;
 
+                case "customer.subscription.created":
+                case "customer.subscription.updated":
+                case "customer.subscription.deleted":
+                    var subscription = (com.stripe.model.Subscription) event.getDataObjectDeserializer().getObject().orElse(null);
+                    if (subscription != null) {
+                        subscriptionId = subscription.getId();
+                        customerId = subscription.getCustomer();
+                        status = subscription.getStatus();
+                        if (subscription.getMetadata() != null) {
+                            metadata.putAll(subscription.getMetadata());
+                        }
+                    }
+                    break;
+
                 case "invoice.payment_succeeded":
                 case "invoice.paid":
                     var invoice = (com.stripe.model.Invoice) event.getDataObjectDeserializer().getObject().orElse(null);
@@ -245,22 +422,26 @@ public class StripeGateway implements PaymentGateway {
                             : null;
                         currency = invoice.getCurrency();
                         status = invoice.getStatus();
-                        if (invoice.getMetadata() != null) {
+                        
+                        // Tentar pegar metadata da invoice primeiro
+                        if (invoice.getMetadata() != null && !invoice.getMetadata().isEmpty()) {
                             metadata.putAll(invoice.getMetadata());
                         }
-                    }
-                    break;
-
-                case "customer.subscription.created":
-                case "customer.subscription.updated":
-                case "customer.subscription.deleted":
-                    var subscription = (com.stripe.model.Subscription) event.getDataObjectDeserializer().getObject().orElse(null);
-                    if (subscription != null) {
-                        subscriptionId = subscription.getId();
-                        customerId = subscription.getCustomer();
-                        status = subscription.getStatus();
-                        if (subscription.getMetadata() != null) {
-                            metadata.putAll(subscription.getMetadata());
+                        
+                        // Se não tiver metadata na invoice, buscar da subscription
+                        if (metadata.isEmpty() && invoice.getSubscription() != null) {
+                            try {
+                                if (apiKey != null && !apiKey.isEmpty()) {
+                                    Stripe.apiKey = apiKey;
+                                }
+                                com.stripe.model.Subscription sub = com.stripe.model.Subscription.retrieve(invoice.getSubscription());
+                                if (sub.getMetadata() != null && !sub.getMetadata().isEmpty()) {
+                                    metadata.putAll(sub.getMetadata());
+                                    log.info("✅ Metadata carregado da Subscription: {}", metadata);
+                                }
+                            } catch (Exception e) {
+                                log.warn("Não foi possível buscar metadata da subscription: {}", e.getMessage());
+                            }
                         }
                     }
                     break;
@@ -395,6 +576,99 @@ public class StripeGateway implements PaymentGateway {
         } catch (StripeException e) {
             log.error("Error fetching Payment Intent details", e);
             throw new RuntimeException("Failed to fetch Payment Intent details: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Atualizar subscription existente com proration automático
+     * Usado para upgrades e downgrades
+     */
+    public Map<String, Object> updateSubscriptionWithProration(
+            String subscriptionId, 
+            String newPriceId, 
+            Map<String, String> metadata) {
+        
+        if (apiKey != null && !apiKey.isEmpty()) {
+            Stripe.apiKey = apiKey;
+        }
+
+        try {
+            log.info("=== UPDATING SUBSCRIPTION WITH PRORATION ===");
+            log.info("Subscription ID: {}", subscriptionId);
+            log.info("New Price ID: {}", newPriceId);
+
+            // 1. Buscar subscription atual
+            com.stripe.model.Subscription currentSubscription = com.stripe.model.Subscription.retrieve(subscriptionId);
+            log.info("Current subscription status: {}", currentSubscription.getStatus());
+            
+            String currentPriceId = currentSubscription.getItems().getData().get(0).getPrice().getId();
+            log.info("Current Price ID: {}", currentPriceId);
+
+            // Verificar se é realmente uma mudança
+            if (currentPriceId.equals(newPriceId)) {
+                log.warn("⚠️ New price is the same as current price. No update needed.");
+                Map<String, Object> result = new HashMap<>();
+                result.put("subscriptionId", subscriptionId);
+                result.put("status", "no_change");
+                result.put("message", "Subscription already on this plan");
+                return result;
+            }
+
+            // 2. Atualizar subscription com proration
+            Map<String, Object> params = new HashMap<>();
+            
+            // Atualizar item da subscription
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", currentSubscription.getItems().getData().get(0).getId());
+            item.put("price", newPriceId);
+            params.put("items", Arrays.asList(item));
+            
+            // Configurar proration
+            params.put("proration_behavior", "create_prorations");  // Criar proration automático
+            params.put("billing_cycle_anchor", "unchanged");  // Manter data de cobrança
+            
+            // Atualizar metadata se fornecido
+            if (metadata != null && !metadata.isEmpty()) {
+                params.put("metadata", metadata);
+            }
+
+            // Expandir invoice para ver detalhes do proration
+            params.put("expand", Arrays.asList("latest_invoice"));
+
+            com.stripe.model.Subscription updatedSubscription = currentSubscription.update(params);
+            
+            log.info("✅ Subscription updated: id={}, status={}", 
+                updatedSubscription.getId(), updatedSubscription.getStatus());
+
+            // 3. Extrair informações da invoice de proration
+            com.stripe.model.Invoice latestInvoice = updatedSubscription.getLatestInvoiceObject();
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("subscriptionId", updatedSubscription.getId());
+            result.put("status", updatedSubscription.getStatus());
+            result.put("currentPeriodEnd", updatedSubscription.getCurrentPeriodEnd());
+            
+            if (latestInvoice != null) {
+                result.put("invoiceId", latestInvoice.getId());
+                result.put("invoiceUrl", latestInvoice.getHostedInvoiceUrl());
+                result.put("amountDue", latestInvoice.getAmountDue());
+                result.put("amountPaid", latestInvoice.getAmountPaid());
+                result.put("total", latestInvoice.getTotal());
+                
+                log.info("📋 Proration Invoice:");
+                log.info("  - Invoice ID: {}", latestInvoice.getId());
+                log.info("  - Amount Due: {} cents", latestInvoice.getAmountDue());
+                log.info("  - Total: {} cents", latestInvoice.getTotal());
+                log.info("  - Status: {}", latestInvoice.getStatus());
+                log.info("  - Invoice URL: {}", latestInvoice.getHostedInvoiceUrl());
+            }
+
+            log.info("=== SUBSCRIPTION UPDATE COMPLETED ===");
+            return result;
+
+        } catch (StripeException e) {
+            log.error("❌ Error updating subscription with proration", e);
+            throw new RuntimeException("Failed to update subscription: " + e.getMessage(), e);
         }
     }
 }

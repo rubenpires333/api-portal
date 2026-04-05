@@ -98,10 +98,22 @@ public class CheckoutService {
 
     @Transactional
     public Map<String, String> createPlatformPaymentIntent(UUID providerId, String planName) {
-        log.info("Criando Payment Intent (Embedded): providerId={}, planName={}", providerId, planName);
+        log.info("Criando Subscription (Embedded): providerId={}, planName={}", providerId, planName);
         
         PlatformPlan plan = planRepository.findByName(planName.toUpperCase())
             .orElseThrow(() -> new IllegalArgumentException("Plan not found: " + planName));
+
+        // VALIDAÇÃO CRÍTICA: Verificar se o plano tem Stripe Price ID configurado
+        if (plan.getStripePriceId() == null || plan.getStripePriceId().isEmpty()) {
+            log.error("❌ Plano {} não tem Stripe Price ID configurado!", plan.getName());
+            throw new IllegalStateException(
+                "Plano " + plan.getName() + " não está configurado no Stripe. " +
+                "Configure o stripe_price_id no banco de dados antes de usar este plano."
+            );
+        }
+        
+        log.info("Plano encontrado: name={}, price={} {}, stripePriceId={}", 
+                 plan.getName(), plan.getMonthlyPrice(), plan.getCurrency(), plan.getStripePriceId());
 
         CheckoutSession localSession = CheckoutSession.builder()
             .providerId(providerId)
@@ -113,12 +125,12 @@ public class CheckoutService {
             .build();
         
         localSession = checkoutSessionRepository.save(localSession);
-        log.info("Sessão local criada para Payment Intent: id={}", localSession.getId());
+        log.info("Sessão local criada para Subscription: id={}", localSession.getId());
 
         PaymentGateway gateway = gatewayFactory.getActive();
         
         if (!"STRIPE".equals(gateway.getType())) {
-            throw new IllegalArgumentException("Payment Intent only supported for Stripe");
+            throw new IllegalArgumentException("Subscription only supported for Stripe");
         }
 
         Map<String, String> metadata = new HashMap<>();
@@ -131,13 +143,24 @@ public class CheckoutService {
         com.api_portal.backend.modules.billing.gateway.stripe.StripeGateway stripeGateway = 
             (com.api_portal.backend.modules.billing.gateway.stripe.StripeGateway) gateway;
 
-        Map<String, String> result = stripeGateway.createPaymentIntent(
-            plan.getMonthlyPrice(), 
-            plan.getCurrency(), 
+        // Usar novo método que cria Subscription ao invés de Payment Intent simples
+        Map<String, String> result = stripeGateway.createSubscriptionWithSetupIntent(
+            plan.getStripePriceId(),
             metadata
         );
         
+        // Salvar IDs do Stripe na sessão local
+        localSession.setStripeSubscriptionId(result.get("subscriptionId"));
+        localSession.setStripeCustomerId(result.get("customerId"));
         localSession.setStripePaymentIntentId(result.get("paymentIntentId"));
+        
+        // Se subscription já está ativa (sem Payment Intent), marcar como COMPLETED
+        if ("active".equals(result.get("status")) && result.get("clientSecret") == null) {
+            log.info("⚠️ Subscription is already active without payment (free/trial plan)");
+            localSession.setStatus(CheckoutSessionStatus.COMPLETED);
+            localSession.setCompletedAt(java.time.LocalDateTime.now());
+        }
+        
         try {
             localSession.setMetadata(objectMapper.writeValueAsString(metadata));
         } catch (Exception e) {
@@ -145,8 +168,9 @@ public class CheckoutService {
         }
         checkoutSessionRepository.save(localSession);
         
-        log.info("Payment Intent criado: paymentIntentId={}, localSessionId={}", 
-                 result.get("paymentIntentId"), localSession.getId());
+        log.info("Subscription criada: subscriptionId={}, customerId={}, paymentIntentId={}, status={}, localSessionId={}", 
+                 result.get("subscriptionId"), result.get("customerId"), 
+                 result.get("paymentIntentId"), result.get("status"), localSession.getId());
         
         return result;
     }
