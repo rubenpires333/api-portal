@@ -307,6 +307,10 @@ public class DataInitializerService implements CommandLineRunner {
             "Permite gerenciar gateways de pagamento, planos e regras de taxas", "billing", "manage"
         ));
         permissions.add(new PermissionData(
+            "Gerenciar FAQs de Planos", "billing.faqs.manage", 
+            "Permite gerenciar FAQs sobre planos de assinatura", "billing", "faqs.manage"
+        ));
+        permissions.add(new PermissionData(
             "Sacar Fundos", "wallet.withdraw", 
             "Permite solicitar saques da carteira", "wallet", "withdraw"
         ));
