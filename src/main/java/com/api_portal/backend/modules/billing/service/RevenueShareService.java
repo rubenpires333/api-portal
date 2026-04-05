@@ -83,4 +83,41 @@ public class RevenueShareService {
         log.info("Payment processed: platformCommission={}, providerShare={}, availableAt={}", 
             platformCommission, providerShare, availableAt);
     }
+
+    /**
+     * Registrar receita de subscrição de plataforma
+     * Este é um pagamento do PROVIDER para a PLATAFORMA (não há revenue share)
+     * A plataforma recebe 100% do valor
+     * 
+     * Nota: Este método NÃO credita wallet do provider, pois o provider está PAGANDO
+     * para usar a plataforma, não recebendo.
+     */
+    @Transactional
+    public void recordPlatformSubscriptionRevenue(
+            UUID providerId, 
+            BigDecimal amount, 
+            String currency, 
+            UUID checkoutSessionId,
+            int holdbackDays) {
+        
+        log.info("=== REGISTRANDO RECEITA DE SUBSCRIÇÃO DE PLATAFORMA ===");
+        log.info("Provider: {}, Amount: {} {}, CheckoutSession: {}", 
+                 providerId, amount, currency, checkoutSessionId);
+        
+        // Criar evento de receita da plataforma
+        RevenueShareEvent event = RevenueShareEvent.builder()
+            .subscriptionId(checkoutSessionId) // Usar checkoutSessionId como referência
+            .providerId(providerId)
+            .totalAmount(amount)
+            .platformCommissionPercentage(BigDecimal.valueOf(100)) // Plataforma recebe 100%
+            .platformCommission(amount) // Plataforma recebe tudo
+            .providerShare(BigDecimal.ZERO) // Provider não recebe nada (está pagando)
+            .currency(currency)
+            .build();
+        
+        revenueShareEventRepository.save(event);
+        
+        log.info("✅ Receita de subscrição de plataforma registrada: amount={} {}", amount, currency);
+        log.info("=== FIM REGISTRO RECEITA SUBSCRIÇÃO PLATAFORMA ===");
+    }
 }

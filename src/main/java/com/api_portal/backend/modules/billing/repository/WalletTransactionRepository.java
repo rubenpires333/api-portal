@@ -18,6 +18,8 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
     
     Page<WalletTransaction> findByWalletOrderByCreatedAtDesc(ProviderWallet wallet, Pageable pageable);
     
+    List<WalletTransaction> findByStatusAndAvailableAtBefore(TransactionStatus status, LocalDateTime availableAt);
+    
     @Query("SELECT t FROM WalletTransaction t WHERE t.status = :status AND t.availableAt <= :now")
     List<WalletTransaction> findPendingTransactionsReadyForRelease(TransactionStatus status, LocalDateTime now);
     

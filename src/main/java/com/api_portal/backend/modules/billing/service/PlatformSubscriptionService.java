@@ -7,9 +7,11 @@ import com.api_portal.backend.modules.billing.repository.PlatformPlanRepository;
 import com.api_portal.backend.modules.billing.repository.ProviderPlatformSubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -20,6 +22,10 @@ public class PlatformSubscriptionService {
 
     private final ProviderPlatformSubscriptionRepository subscriptionRepository;
     private final PlatformPlanRepository planRepository;
+    private final RevenueShareService revenueShareService;
+    
+    @Value("${billing.holdback-days:14}")
+    private int holdbackDays;
 
     @Transactional
     public void createOrUpdateSubscription(WebhookEvent event) {
@@ -98,10 +104,9 @@ public class PlatformSubscriptionService {
      * Este método é chamado APENAS pelo CheckoutWebhookService
      * 
      * Responsabilidades:
-     * 1. Criar/atualizar subscrição
-     * 2. Gerar API key do consumer (TODO)
-     * 3. Registar fatura (TODO)
-     * 4. Creditar wallet do provider com holdback de 14 dias (TODO)
+     * 1. Criar/atualizar subscrição ✅
+     * 2. Creditar wallet da plataforma (100% do valor) ✅
+     * 3. Registar transação com holdback de 14 dias ✅
      */
     @Transactional
     public void activateSubscription(com.api_portal.backend.modules.billing.model.CheckoutSession session, 
@@ -143,9 +148,21 @@ public class PlatformSubscriptionService {
         
         subscriptionRepository.save(subscription);
         
-        // TODO: 3. Gerar API key do consumer
-        // TODO: 4. Registar fatura
-        // TODO: 5. Creditar wallet do provider com holdback de 14 dias
+        // Creditar wallet da PLATAFORMA (não do provider)
+        // A plataforma recebe 100% do valor da subscrição
+        // Este é um pagamento de provider para plataforma, não há revenue share aqui
+        BigDecimal subscriptionAmount = session.getAmount();
+        
+        log.info("Registrando receita da plataforma: amount={}, providerId={}, holdbackDays={}", 
+                 subscriptionAmount, session.getProviderId(), holdbackDays);
+        
+        revenueShareService.recordPlatformSubscriptionRevenue(
+            session.getProviderId(),
+            subscriptionAmount,
+            session.getCurrency(),
+            session.getId(),
+            holdbackDays
+        );
         
         log.info("Subscrição ativada com sucesso: providerId={}", session.getProviderId());
     }

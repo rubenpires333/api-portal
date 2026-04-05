@@ -14,8 +14,10 @@ import java.util.List;
 
 /**
  * Job agendado que libera transações após o período de holdback (14 dias)
+ * 
+ * DESABILITADO: Usar HoldbackReleaseJob em vez deste
  */
-@Service
+//@Service
 @RequiredArgsConstructor
 @Slf4j
 public class HoldbackReleaseScheduler {
