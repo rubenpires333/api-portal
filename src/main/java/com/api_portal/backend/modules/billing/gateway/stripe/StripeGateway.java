@@ -36,11 +36,14 @@ public class StripeGateway implements PaymentGateway {
 
     @PostConstruct
     public void init() {
-        if (apiKey != null && !apiKey.isEmpty()) {
+        log.info("Initializing Stripe gateway...");
+        log.info("API Key from config: {}", apiKey != null ? apiKey.substring(0, Math.min(15, apiKey.length())) + "..." : "NULL");
+        
+        if (apiKey != null && !apiKey.isEmpty() && !apiKey.isBlank()) {
             Stripe.apiKey = apiKey;
-            log.info("Stripe gateway initialized with API key");
+            log.info("✅ Stripe gateway initialized successfully with API key");
         } else {
-            log.warn("Stripe API key not configured");
+            log.error("❌ Stripe API key is NULL or EMPTY - Check application-billing.properties");
         }
     }
 
@@ -51,6 +54,13 @@ public class StripeGateway implements PaymentGateway {
 
     @Override
     public CheckoutSession createCheckoutSession(CheckoutRequest request) {
+        // Garantir que a chave está setada antes de cada chamada
+        if (apiKey != null && !apiKey.isEmpty()) {
+            Stripe.apiKey = apiKey;
+        } else {
+            throw new RuntimeException("Stripe API key not configured");
+        }
+        
         try {
             log.info("Creating Stripe checkout session for order: {}", request.getOrderId());
 
@@ -134,6 +144,50 @@ public class StripeGateway implements PaymentGateway {
     }
 
     /**
+     * Criar Payment Intent para pagamento embutido
+     */
+    public Map<String, String> createPaymentIntent(BigDecimal amount, String currency, Map<String, String> metadata) {
+        if (apiKey != null && !apiKey.isEmpty()) {
+            Stripe.apiKey = apiKey;
+        } else {
+            throw new RuntimeException("Stripe API key not configured");
+        }
+
+        try {
+            log.info("Creating Stripe Payment Intent: amount={}, currency={}, metadata={}", amount, currency, metadata);
+
+            // Converter para centavos
+            long amountInCents = amount.multiply(BigDecimal.valueOf(100)).longValue();
+
+            Map<String, Object> params = new HashMap<>();
+            params.put("amount", amountInCents);
+            params.put("currency", currency.toLowerCase());
+            params.put("automatic_payment_methods", Map.of("enabled", true));
+            
+            if (metadata != null && !metadata.isEmpty()) {
+                params.put("metadata", metadata);
+                log.info("✅ Metadata added to Payment Intent: {}", metadata);
+            } else {
+                log.warn("⚠️ No metadata provided for Payment Intent");
+            }
+
+            com.stripe.model.PaymentIntent paymentIntent = com.stripe.model.PaymentIntent.create(params);
+
+            log.info("Payment Intent created: id={}, metadata={}", paymentIntent.getId(), paymentIntent.getMetadata());
+
+            Map<String, String> result = new HashMap<>();
+            result.put("clientSecret", paymentIntent.getClientSecret());
+            result.put("paymentIntentId", paymentIntent.getId());
+            
+            return result;
+
+        } catch (StripeException e) {
+            log.error("Error creating Payment Intent", e);
+            throw new RuntimeException("Failed to create Payment Intent: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Converte evento do Stripe para formato interno
      */
     private WebhookEvent convertStripeEvent(Event event) {
@@ -198,6 +252,7 @@ public class StripeGateway implements PaymentGateway {
                     break;
 
                 case "payment_intent.succeeded":
+                case "payment_intent.created":
                     var paymentIntent = (com.stripe.model.PaymentIntent) event.getDataObjectDeserializer().getObject().orElse(null);
                     if (paymentIntent != null) {
                         paymentId = paymentIntent.getId();
@@ -207,8 +262,26 @@ public class StripeGateway implements PaymentGateway {
                             : null;
                         currency = paymentIntent.getCurrency();
                         status = paymentIntent.getStatus();
-                        if (paymentIntent.getMetadata() != null) {
+                        
+                        // IMPORTANTE: Buscar metadata do Payment Intent completo
+                        // porque o webhook pode não incluir metadata
+                        if (paymentIntent.getMetadata() != null && !paymentIntent.getMetadata().isEmpty()) {
                             metadata.putAll(paymentIntent.getMetadata());
+                            log.info("✅ Metadata found in webhook PaymentIntent: {}", metadata);
+                        } else {
+                            // Buscar Payment Intent completo para obter metadata
+                            try {
+                                log.warn("⚠️ Metadata empty in webhook, fetching full PaymentIntent: {}", paymentId);
+                                com.stripe.model.PaymentIntent fullPI = com.stripe.model.PaymentIntent.retrieve(paymentId);
+                                if (fullPI.getMetadata() != null && !fullPI.getMetadata().isEmpty()) {
+                                    metadata.putAll(fullPI.getMetadata());
+                                    log.info("✅ Metadata retrieved from full PaymentIntent: {}", metadata);
+                                } else {
+                                    log.warn("⚠️ No metadata found even in full PaymentIntent");
+                                }
+                            } catch (Exception e) {
+                                log.error("Error fetching full PaymentIntent for metadata", e);
+                            }
                         }
                     }
                     break;
@@ -232,5 +305,50 @@ public class StripeGateway implements PaymentGateway {
                 ZoneId.systemDefault()))
             .metadata(metadata)
             .build();
+    }
+
+    /**
+     * Buscar detalhes do Payment Intent para gerar recibo
+     */
+    public Map<String, Object> getPaymentIntentDetails(String paymentIntentId) {
+        if (apiKey != null && !apiKey.isEmpty()) {
+            Stripe.apiKey = apiKey;
+        } else {
+            throw new RuntimeException("Stripe API key not configured");
+        }
+
+        try {
+            log.info("Fetching Payment Intent details: id={}", paymentIntentId);
+
+            com.stripe.model.PaymentIntent paymentIntent = com.stripe.model.PaymentIntent.retrieve(paymentIntentId);
+
+            Map<String, Object> receipt = new HashMap<>();
+            receipt.put("paymentIntentId", paymentIntent.getId());
+            receipt.put("amount", BigDecimal.valueOf(paymentIntent.getAmount()).divide(BigDecimal.valueOf(100)));
+            receipt.put("currency", paymentIntent.getCurrency().toUpperCase());
+            receipt.put("status", paymentIntent.getStatus());
+            receipt.put("created", LocalDateTime.ofInstant(
+                Instant.ofEpochSecond(paymentIntent.getCreated()), 
+                ZoneId.systemDefault()));
+            receipt.put("metadata", paymentIntent.getMetadata());
+            
+            // Buscar charge associado ao Payment Intent
+            if (paymentIntent.getLatestCharge() != null) {
+                try {
+                    com.stripe.model.Charge charge = com.stripe.model.Charge.retrieve(paymentIntent.getLatestCharge());
+                    receipt.put("receiptUrl", charge.getReceiptUrl());
+                    receipt.put("receiptNumber", charge.getReceiptNumber());
+                } catch (Exception e) {
+                    log.warn("Could not retrieve charge details", e);
+                }
+            }
+
+            log.info("Payment Intent details retrieved successfully");
+            return receipt;
+
+        } catch (StripeException e) {
+            log.error("Error fetching Payment Intent details", e);
+            throw new RuntimeException("Failed to fetch Payment Intent details: " + e.getMessage(), e);
+        }
     }
 }

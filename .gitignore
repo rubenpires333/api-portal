@@ -37,5 +37,9 @@ build/
 .env.local
 .env.*.local
 
+### Local Properties (com secrets) ###
+src/main/resources/application-local.properties
+src/main/resources/application-secrets.properties
+
 ### Uploads ###
 uploads/

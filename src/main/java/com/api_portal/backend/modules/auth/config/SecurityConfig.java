@@ -69,7 +69,9 @@ public class SecurityConfig {
                     "/error",
                     "/gateway/api/**",
                     "/api/v1/gateway/test",
-                    "/uploads/**"
+                    "/uploads/**",
+                    "/api/v1/webhooks/**",
+                    "/api/v1/billing/health"
                 ).permitAll()
                 // Endpoints públicos de leitura (GET)
                 .requestMatchers(

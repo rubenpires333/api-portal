@@ -127,7 +127,7 @@ public class WithdrawalProcessingService {
         // TODO: Integrar com sistema bancário
         log.info("Processing bank transfer: {}", request.getDestinationDetails());
         return true; // Simulação
-    }
+    } 
 
     private boolean processPayPalPayment(WithdrawalRequest request) {
         // TODO: Integrar com PayPal Payouts API

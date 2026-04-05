@@ -67,4 +67,51 @@ public class CheckoutService {
             default -> throw new IllegalArgumentException("Unsupported gateway: " + gatewayType);
         };
     }
+
+    public Map<String, String> createPlatformPaymentIntent(UUID providerId, String planName) {
+        PlatformPlan plan = planRepository.findByName(planName.toUpperCase())
+            .orElseThrow(() -> new IllegalArgumentException("Plan not found: " + planName));
+
+        PaymentGateway gateway = gatewayFactory.getActive();
+        
+        if (!"STRIPE".equals(gateway.getType())) {
+            throw new IllegalArgumentException("Payment Intent only supported for Stripe gateway");
+        }
+
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put("providerId", providerId.toString());
+        metadata.put("planId", plan.getId().toString());
+        metadata.put("planName", plan.getName());
+        metadata.put("type", "platform_subscription");
+
+        log.info("=== CREATING PAYMENT INTENT ===");
+        log.info("Provider ID: {}", providerId);
+        log.info("Plan ID: {}", plan.getId());
+        log.info("Plan Name: {}", plan.getName());
+        log.info("Metadata: {}", metadata);
+
+        // Cast para StripeGateway para acessar método específico
+        com.api_portal.backend.modules.billing.gateway.stripe.StripeGateway stripeGateway = 
+            (com.api_portal.backend.modules.billing.gateway.stripe.StripeGateway) gateway;
+
+        Map<String, String> result = stripeGateway.createPaymentIntent(plan.getMonthlyPrice(), plan.getCurrency(), metadata);
+        
+        log.info("Payment Intent Result: {}", result);
+        log.info("=== END CREATING PAYMENT INTENT ===");
+        
+        return result;
+    }
+
+    public Map<String, Object> getPaymentReceipt(String paymentIntentId) {
+        PaymentGateway gateway = gatewayFactory.getActive();
+        
+        if (!"STRIPE".equals(gateway.getType())) {
+            throw new IllegalArgumentException("Receipt only supported for Stripe gateway");
+        }
+
+        com.api_portal.backend.modules.billing.gateway.stripe.StripeGateway stripeGateway = 
+            (com.api_portal.backend.modules.billing.gateway.stripe.StripeGateway) gateway;
+
+        return stripeGateway.getPaymentIntentDetails(paymentIntentId);
+    }
 }

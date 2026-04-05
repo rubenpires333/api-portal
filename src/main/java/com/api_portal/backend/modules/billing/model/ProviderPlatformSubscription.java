@@ -1,51 +1,55 @@
 package com.api_portal.backend.modules.billing.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "provider_platform_subscriptions")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProviderPlatformSub {
+public class ProviderPlatformSubscription {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
-    @Column(nullable = false)
+    @Column(name = "provider_id", nullable = false)
     private UUID providerId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "plan_id", nullable = false)
     private PlatformPlan plan;
 
-    @Column(nullable = false)
-    private String status; // ACTIVE, CANCELLED, PAST_DUE, TRIALING
+    @Column(name = "stripe_subscription_id")
+    private String stripeSubscriptionId;
 
-    private String gatewaySubscriptionId; // ID da subscription no gateway
+    @Column(name = "stripe_customer_id")
+    private String stripeCustomerId;
 
-    @Column(precision = 10, scale = 2)
-    private BigDecimal currentPrice;
+    @Column(name = "status", nullable = false)
+    @Builder.Default
+    private String status = "active";
 
+    @Column(name = "current_period_start")
     private LocalDateTime currentPeriodStart;
-    private LocalDateTime currentPeriodEnd;
-    private LocalDateTime cancelAt;
-    private LocalDateTime cancelledAt;
 
-    @Column(nullable = false, updatable = false)
+    @Column(name = "current_period_end")
+    private LocalDateTime currentPeriodEnd;
+
+    @Column(name = "cancel_at_period_end")
+    @Builder.Default
+    private Boolean cancelAtPeriodEnd = false;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(nullable = false)
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @PrePersist
