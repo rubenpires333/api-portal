@@ -29,7 +29,6 @@ public class PlatformSubscriptionService {
             log.info("Event Type: {}", event.getEventType());
             log.info("Metadata: {}", event.getMetadata());
             
-            // Extrair dados do metadata
             String planIdStr = event.getMetadata().get("planId");
             String providerIdStr = event.getMetadata().get("providerId");
             
@@ -47,19 +46,16 @@ public class PlatformSubscriptionService {
             log.info("Parsed planId: {}", planId);
             log.info("Parsed providerId: {}", providerId);
 
-            // Buscar plano
             PlatformPlan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found: " + planId));
 
             log.info("Plan found: {}", plan.getName());
 
-            // Verificar se já existe assinatura para este provider
             ProviderPlatformSubscription subscription = subscriptionRepository
                 .findByProviderId(providerId)
                 .orElse(null);
 
             if (subscription == null) {
-                // Criar nova assinatura
                 subscription = ProviderPlatformSubscription.builder()
                     .providerId(providerId)
                     .plan(plan)
@@ -73,7 +69,6 @@ public class PlatformSubscriptionService {
                 
                 log.info("Creating new platform subscription for provider: {}", providerId);
             } else {
-                // Atualizar assinatura existente
                 subscription.setPlan(plan);
                 subscription.setStripeSubscriptionId(event.getSubscriptionId());
                 subscription.setStripeCustomerId(event.getCustomerId());
@@ -96,5 +91,62 @@ public class PlatformSubscriptionService {
 
     public ProviderPlatformSubscription getSubscriptionByProviderId(UUID providerId) {
         return subscriptionRepository.findByProviderId(providerId).orElse(null);
+    }
+
+    /**
+     * Ativar subscrição após confirmação do webhook
+     * Este método é chamado APENAS pelo CheckoutWebhookService
+     * 
+     * Responsabilidades:
+     * 1. Criar/atualizar subscrição
+     * 2. Gerar API key do consumer (TODO)
+     * 3. Registar fatura (TODO)
+     * 4. Creditar wallet do provider com holdback de 14 dias (TODO)
+     */
+    @Transactional
+    public void activateSubscription(com.api_portal.backend.modules.billing.model.CheckoutSession session, 
+                                     WebhookEvent event) {
+        log.info("Ativando subscrição: sessionId={}, providerId={}", session.getId(), session.getProviderId());
+        
+        PlatformPlan plan = planRepository.findById(session.getPlanId())
+            .orElseThrow(() -> new RuntimeException("Plan not found: " + session.getPlanId()));
+        
+        ProviderPlatformSubscription subscription = subscriptionRepository
+            .findByProviderId(session.getProviderId())
+            .orElse(null);
+        
+        if (subscription == null) {
+            subscription = ProviderPlatformSubscription.builder()
+                .providerId(session.getProviderId())
+                .plan(plan)
+                .stripeSubscriptionId(session.getStripeSubscriptionId())
+                .stripeCustomerId(session.getStripeCustomerId())
+                .status("active")
+                .currentPeriodStart(LocalDateTime.now())
+                .currentPeriodEnd(LocalDateTime.now().plusMonths(1))
+                .cancelAtPeriodEnd(false)
+                .build();
+            
+            log.info("Nova subscrição criada: providerId={}, plan={}", 
+                     session.getProviderId(), plan.getName());
+        } else {
+            subscription.setPlan(plan);
+            subscription.setStripeSubscriptionId(session.getStripeSubscriptionId());
+            subscription.setStripeCustomerId(session.getStripeCustomerId());
+            subscription.setStatus("active");
+            subscription.setCurrentPeriodStart(LocalDateTime.now());
+            subscription.setCurrentPeriodEnd(LocalDateTime.now().plusMonths(1));
+            
+            log.info("Subscrição atualizada: providerId={}, plan={}", 
+                     session.getProviderId(), plan.getName());
+        }
+        
+        subscriptionRepository.save(subscription);
+        
+        // TODO: 3. Gerar API key do consumer
+        // TODO: 4. Registar fatura
+        // TODO: 5. Creditar wallet do provider com holdback de 14 dias
+        
+        log.info("Subscrição ativada com sucesso: providerId={}", session.getProviderId());
     }
 }

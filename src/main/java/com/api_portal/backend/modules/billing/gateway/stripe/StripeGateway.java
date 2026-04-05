@@ -149,7 +149,9 @@ public class StripeGateway implements PaymentGateway {
     public Map<String, String> createPaymentIntent(BigDecimal amount, String currency, Map<String, String> metadata) {
         if (apiKey != null && !apiKey.isEmpty()) {
             Stripe.apiKey = apiKey;
+            log.info("✅ Stripe API key set for Payment Intent creation");
         } else {
+            log.error("❌ Stripe API key is NULL or EMPTY");
             throw new RuntimeException("Stripe API key not configured");
         }
 
@@ -166,14 +168,22 @@ public class StripeGateway implements PaymentGateway {
             
             if (metadata != null && !metadata.isEmpty()) {
                 params.put("metadata", metadata);
-                log.info("✅ Metadata added to Payment Intent: {}", metadata);
+                log.info("✅ Metadata added to Payment Intent params: {}", metadata);
             } else {
                 log.warn("⚠️ No metadata provided for Payment Intent");
             }
 
+            log.info("Calling Stripe API with params: {}", params);
             com.stripe.model.PaymentIntent paymentIntent = com.stripe.model.PaymentIntent.create(params);
 
             log.info("Payment Intent created: id={}, metadata={}", paymentIntent.getId(), paymentIntent.getMetadata());
+            
+            // Verificar imediatamente se metadata foi salvo
+            if (paymentIntent.getMetadata() == null || paymentIntent.getMetadata().isEmpty()) {
+                log.error("❌ CRITICAL: Payment Intent created WITHOUT metadata! This will cause webhook processing to fail!");
+            } else {
+                log.info("✅ Payment Intent metadata confirmed: {}", paymentIntent.getMetadata());
+            }
 
             Map<String, String> result = new HashMap<>();
             result.put("clientSecret", paymentIntent.getClientSecret());
@@ -191,6 +201,8 @@ public class StripeGateway implements PaymentGateway {
      * Converte evento do Stripe para formato interno
      */
     private WebhookEvent convertStripeEvent(Event event) {
+        log.info("Converting Stripe event: type={}, id={}", event.getType(), event.getId());
+        
         Map<String, String> metadata = new HashMap<>();
 
         // Extrair dados específicos baseado no tipo de evento
@@ -216,6 +228,8 @@ public class StripeGateway implements PaymentGateway {
                         if (session.getMetadata() != null) {
                             metadata.putAll(session.getMetadata());
                         }
+                        // Adicionar o ID da sessão Stripe ao metadata
+                        metadata.put("stripeSessionId", session.getId());
                     }
                     break;
 
@@ -263,32 +277,64 @@ public class StripeGateway implements PaymentGateway {
                         currency = paymentIntent.getCurrency();
                         status = paymentIntent.getStatus();
                         
-                        // IMPORTANTE: Buscar metadata do Payment Intent completo
-                        // porque o webhook pode não incluir metadata
+                        log.info("PaymentIntent do webhook: id={}, metadata={}", paymentId, paymentIntent.getMetadata());
+                        
                         if (paymentIntent.getMetadata() != null && !paymentIntent.getMetadata().isEmpty()) {
                             metadata.putAll(paymentIntent.getMetadata());
-                            log.info("✅ Metadata found in webhook PaymentIntent: {}", metadata);
-                        } else {
-                            // Buscar Payment Intent completo para obter metadata
-                            try {
-                                log.warn("⚠️ Metadata empty in webhook, fetching full PaymentIntent: {}", paymentId);
-                                com.stripe.model.PaymentIntent fullPI = com.stripe.model.PaymentIntent.retrieve(paymentId);
-                                if (fullPI.getMetadata() != null && !fullPI.getMetadata().isEmpty()) {
-                                    metadata.putAll(fullPI.getMetadata());
-                                    log.info("✅ Metadata retrieved from full PaymentIntent: {}", metadata);
-                                } else {
-                                    log.warn("⚠️ No metadata found even in full PaymentIntent");
+                        }
+                    } else {
+                        // Fallback: extrair ID do evento e buscar da API (Stripe CLI forwarding)
+                        log.warn("⚠️ PaymentIntent object is NULL, extracting ID from event");
+                        try {
+                            // O ID do Payment Intent está no raw JSON
+                            String rawJson = event.getData().toJson();
+                            log.debug("Raw event data JSON: {}", rawJson);
+                            
+                            // Extrair ID do objeto (não do evento)
+                            // Procurar por "object": {"id": "pi_xxx"
+                            int objectStart = rawJson.indexOf("\"object\": {");
+                            if (objectStart > 0) {
+                                int idStart = rawJson.indexOf("\"id\": \"", objectStart) + 7;
+                                int idEnd = rawJson.indexOf("\"", idStart);
+                                if (idStart > 7 && idEnd > idStart) {
+                                    paymentId = rawJson.substring(idStart, idEnd);
+                                    log.info("Extracted Payment Intent ID from JSON: {}", paymentId);
+                                    
+                                    // Buscar Payment Intent completo da API
+                                    if (apiKey != null && !apiKey.isEmpty()) {
+                                        Stripe.apiKey = apiKey;
+                                    }
+                                    
+                                    log.info("Buscando Payment Intent completo da API: {}", paymentId);
+                                    com.stripe.model.PaymentIntent fullPI = com.stripe.model.PaymentIntent.retrieve(paymentId);
+                                    
+                                    customerId = fullPI.getCustomer();
+                                    amount = fullPI.getAmount() != null 
+                                        ? BigDecimal.valueOf(fullPI.getAmount()).divide(BigDecimal.valueOf(100)) 
+                                        : null;
+                                    currency = fullPI.getCurrency();
+                                    status = fullPI.getStatus();
+                                    
+                                    if (fullPI.getMetadata() != null && !fullPI.getMetadata().isEmpty()) {
+                                        metadata.putAll(fullPI.getMetadata());
+                                        log.info("✅ Metadata carregado do Payment Intent: {}", metadata);
+                                    } else {
+                                        log.warn("⚠️ Payment Intent {} não tem metadata", paymentId);
+                                    }
                                 }
-                            } catch (Exception e) {
-                                log.error("Error fetching full PaymentIntent for metadata", e);
                             }
+                        } catch (Exception e) {
+                            log.error("Erro ao extrair Payment Intent do JSON: {}", e.getMessage(), e);
                         }
                     }
                     break;
             }
         } catch (Exception e) {
-            log.error("Error extracting data from Stripe event: {}", event.getType(), e);
+            log.error("Error extracting data from Stripe event: type={}, id={}", event.getType(), event.getId(), e);
         }
+
+        log.info("Extracted from event: paymentId={}, subscriptionId={}, customerId={}, amount={}, metadata={}", 
+            paymentId, subscriptionId, customerId, amount, metadata);
 
         return WebhookEvent.builder()
             .eventId(event.getId())

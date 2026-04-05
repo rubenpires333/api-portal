@@ -71,8 +71,13 @@ public class SecurityConfig {
                     "/api/v1/gateway/test",
                     "/uploads/**",
                     "/api/v1/webhooks/**",
-                    "/api/v1/billing/health"
+                    "/api/v1/billing/health",
+                    "/api/v1/billing/config"
                 ).permitAll()
+                // Billing endpoints requerem autenticação
+                .requestMatchers(
+                    "/api/v1/billing/**"
+                ).authenticated()
                 // Endpoints públicos de leitura (GET)
                 .requestMatchers(
                     org.springframework.http.HttpMethod.GET,

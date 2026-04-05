@@ -1,7 +1,6 @@
 package com.api_portal.backend.modules.billing.controller;
 
 import com.api_portal.backend.modules.billing.dto.CheckoutSessionDTO;
-import com.api_portal.backend.modules.billing.gateway.PaymentGatewayFactory;
 import com.api_portal.backend.modules.billing.model.PlatformPlan;
 import com.api_portal.backend.modules.billing.repository.PlatformPlanRepository;
 import com.api_portal.backend.modules.billing.service.CheckoutService;
@@ -21,7 +20,6 @@ import java.util.UUID;
 public class BillingController {
 
     private final CheckoutService checkoutService;
-    private final PaymentGatewayFactory gatewayFactory;
     private final PlatformPlanRepository planRepository;
 
     @Value("${billing.stripe.publishable-key:}")
@@ -38,7 +36,6 @@ public class BillingController {
     @GetMapping("/config")
     public ResponseEntity<Map<String, String>> getConfig() {
         Map<String, String> config = new HashMap<>();
-        // Retornar apenas a chave pública (seguro para o frontend)
         config.put("publishableKey", stripePublishableKey);
         return ResponseEntity.ok(config);
     }
@@ -71,13 +68,10 @@ public class BillingController {
         return ResponseEntity.ok(paymentIntent);
     }
 
-    @GetMapping("/receipt/{paymentIntentId}")
-    public ResponseEntity<Map<String, Object>> getReceipt(@PathVariable String paymentIntentId) {
-        try {
-            Map<String, Object> receipt = checkoutService.getPaymentReceipt(paymentIntentId);
-            return ResponseEntity.ok(receipt);
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
-        }
+    @PostMapping("/checkout/cancel")
+    public ResponseEntity<Void> cancelCheckout(@RequestBody Map<String, String> request) {
+        String sessionId = request.get("sessionId");
+        checkoutService.cancelCheckoutSession(sessionId);
+        return ResponseEntity.ok().build();
     }
 }

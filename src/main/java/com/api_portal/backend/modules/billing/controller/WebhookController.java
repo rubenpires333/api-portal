@@ -6,6 +6,7 @@ import com.api_portal.backend.modules.billing.gateway.dto.WebhookEvent;
 import com.api_portal.backend.modules.billing.model.PaymentWebhook;
 import com.api_portal.backend.modules.billing.model.enums.GatewayType;
 import com.api_portal.backend.modules.billing.repository.PaymentWebhookRepository;
+import com.api_portal.backend.modules.billing.service.CheckoutWebhookService;
 import com.api_portal.backend.modules.billing.service.PlatformSubscriptionService;
 import com.api_portal.backend.modules.billing.service.RevenueShareService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class WebhookController {
     private final PaymentWebhookRepository webhookRepository;
     private final RevenueShareService revenueShareService;
     private final PlatformSubscriptionService platformSubscriptionService;
+    private final CheckoutWebhookService checkoutWebhookService;
 
     @PostMapping("/{gateway}")
     public ResponseEntity<Void> handleWebhook(
@@ -93,6 +95,33 @@ public class WebhookController {
             log.info("Event ID: {}", event.getEventId());
             log.info("Metadata: {}", event.getMetadata());
 
+            // FASE 3: Processar checkout.session.completed (Hosted Checkout)
+            if (eventType.equals("checkout.session.completed")) {
+                log.info("Processando checkout.session.completed via CheckoutWebhookService");
+                checkoutWebhookService.processCheckoutCompleted(event);
+                webhook.setProcessed(true);
+                webhookRepository.save(webhook);
+                log.info("✅ Checkout completed processado com sucesso");
+                return;
+            }
+
+            // FASE 3: Processar payment_intent.succeeded (Embedded Payment)
+            if (eventType.equals("payment_intent.succeeded")) {
+                // Tentar processar como subscrição de plataforma
+                // O CheckoutWebhookService vai verificar se existe CheckoutSession correspondente
+                log.info("Tentando processar payment_intent.succeeded como subscrição de plataforma");
+                try {
+                    checkoutWebhookService.processPaymentIntentSucceeded(event);
+                    webhook.setProcessed(true);
+                    webhookRepository.save(webhook);
+                    log.info("✅ Payment Intent succeeded processado como subscrição de plataforma");
+                    return;
+                } catch (IllegalStateException e) {
+                    // Não é subscrição de plataforma, continuar processamento normal
+                    log.info("Payment Intent não é subscrição de plataforma, processando como API payment");
+                }
+            }
+
             // Verificar se é evento de plataforma (tem planId no metadata)
             boolean isPlatformSubscription = event.getMetadata() != null && 
                 event.getMetadata().containsKey("planId");
@@ -101,9 +130,7 @@ public class WebhookController {
 
             if (isPlatformSubscription) {
                 log.info("Processing as PLATFORM subscription event");
-                // Eventos de assinatura de plataforma
-                if (eventType.contains("payment_intent.succeeded") || 
-                    eventType.contains("invoice.payment_succeeded")) {
+                if (eventType.contains("invoice.payment_succeeded")) {
                     log.info("Calling platformSubscriptionService.createOrUpdateSubscription()");
                     platformSubscriptionService.createOrUpdateSubscription(event);
                 } else {
@@ -111,14 +138,12 @@ public class WebhookController {
                 }
             } else {
                 log.info("Processing as API payment (revenue share) event");
-                // Eventos de pagamento de API (revenue share)
                 if (eventType.equals("payment_intent.succeeded") || 
                     eventType.equals("invoice.payment_succeeded")) {
                     handlePaymentSuccess(event);
                 }
             }
 
-            // Marcar como processado
             webhook.setProcessed(true);
             webhookRepository.save(webhook);
             
@@ -128,7 +153,6 @@ public class WebhookController {
         } catch (Exception e) {
             log.error("❌ Error processing webhook event: eventId={}, error={}", 
                 event.getEventId(), e.getMessage(), e);
-            // Não marcar como processado para permitir retry manual
         }
     }
 
