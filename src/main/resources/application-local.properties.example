@@ -1,8 +1,0 @@
-# Local Configuration Example
-# Copie este arquivo para application-local.properties e preencha com seus secrets reais
-# cp application-local.properties.example application-local.properties
-
-# Stripe Configuration (obtenha em https://dashboard.stripe.com/apikeys)
-billing.stripe.api-key=sk_test_your_stripe_secret_key_here
-billing.stripe.publishable-key=pk_test_your_stripe_publishable_key_here
-billing.stripe.webhook-secret=whsec_your_webhook_secret_here
