@@ -549,29 +549,62 @@ public class StripeGateway implements PaymentGateway {
 
             com.stripe.model.PaymentIntent paymentIntent = com.stripe.model.PaymentIntent.retrieve(paymentIntentId);
 
-            Map<String, Object> receipt = new HashMap<>();
-            receipt.put("paymentIntentId", paymentIntent.getId());
-            receipt.put("amount", BigDecimal.valueOf(paymentIntent.getAmount()).divide(BigDecimal.valueOf(100)));
-            receipt.put("currency", paymentIntent.getCurrency().toUpperCase());
-            receipt.put("status", paymentIntent.getStatus());
-            receipt.put("created", LocalDateTime.ofInstant(
+            Map<String, Object> details = new HashMap<>();
+            details.put("paymentIntentId", paymentIntent.getId());
+            details.put("amount", BigDecimal.valueOf(paymentIntent.getAmount()).divide(BigDecimal.valueOf(100)));
+            details.put("currency", paymentIntent.getCurrency().toUpperCase());
+            details.put("status", paymentIntent.getStatus());
+            details.put("created", LocalDateTime.ofInstant(
                 Instant.ofEpochSecond(paymentIntent.getCreated()), 
                 ZoneId.systemDefault()));
-            receipt.put("metadata", paymentIntent.getMetadata());
+            details.put("metadata", paymentIntent.getMetadata());
             
-            // Buscar charge associado ao Payment Intent
+            // Buscar payment method details (card info)
+            if (paymentIntent.getPaymentMethod() != null) {
+                try {
+                    com.stripe.model.PaymentMethod paymentMethod = com.stripe.model.PaymentMethod.retrieve(
+                        paymentIntent.getPaymentMethod()
+                    );
+                    details.put("paymentMethodType", paymentMethod.getType());
+                    
+                    if ("card".equals(paymentMethod.getType()) && paymentMethod.getCard() != null) {
+                        details.put("cardBrand", paymentMethod.getCard().getBrand());
+                        details.put("cardLast4", paymentMethod.getCard().getLast4());
+                    }
+                } catch (Exception e) {
+                    log.warn("Could not retrieve payment method details", e);
+                }
+            }
+            
+            // Buscar charge associado ao Payment Intent (receipt URL)
             if (paymentIntent.getLatestCharge() != null) {
                 try {
                     com.stripe.model.Charge charge = com.stripe.model.Charge.retrieve(paymentIntent.getLatestCharge());
-                    receipt.put("receiptUrl", charge.getReceiptUrl());
-                    receipt.put("receiptNumber", charge.getReceiptNumber());
+                    details.put("receiptUrl", charge.getReceiptUrl());
+                    details.put("receiptNumber", charge.getReceiptNumber());
                 } catch (Exception e) {
                     log.warn("Could not retrieve charge details", e);
                 }
             }
+            
+            // Buscar invoice associada (se houver)
+            if (paymentIntent.getInvoice() != null) {
+                try {
+                    com.stripe.model.Invoice invoice = com.stripe.model.Invoice.retrieve(
+                        paymentIntent.getInvoice()
+                    );
+                    details.put("invoiceId", invoice.getId());
+                    details.put("invoiceNumber", invoice.getNumber());
+                    details.put("invoicePdfUrl", invoice.getInvoicePdf());
+                    details.put("invoiceUrl", invoice.getHostedInvoiceUrl());
+                } catch (Exception e) {
+                    log.warn("Could not retrieve invoice details", e);
+                }
+            }
 
-            log.info("Payment Intent details retrieved successfully");
-            return receipt;
+            log.info("Payment Intent details retrieved successfully: cardBrand={}, cardLast4={}, invoiceNumber={}", 
+                details.get("cardBrand"), details.get("cardLast4"), details.get("invoiceNumber"));
+            return details;
 
         } catch (StripeException e) {
             log.error("Error fetching Payment Intent details", e);

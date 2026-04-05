@@ -16,6 +16,7 @@ import java.util.UUID;
 public class PaymentHistoryDTO {
     private UUID id;
     private String invoiceId;
+    private String invoiceNumber; // Número legível da invoice
     private String planName;
     private BigDecimal amount;
     private String currency;
@@ -25,4 +26,9 @@ public class PaymentHistoryDTO {
     private String receiptUrl;
     private String invoicePdf;
     private String failureReason;
+    
+    // Detalhes do método de pagamento
+    private String paymentMethodType; // card, sepa_debit, etc
+    private String cardBrand; // visa, mastercard, amex
+    private String cardLast4; // Últimos 4 dígitos
 }

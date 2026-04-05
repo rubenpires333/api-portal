@@ -99,10 +99,29 @@ public class RevenueShareService {
             String currency, 
             UUID checkoutSessionId,
             int holdbackDays) {
+        recordPlatformSubscriptionRevenue(providerId, amount, currency, checkoutSessionId, holdbackDays, null);
+    }
+    
+    /**
+     * Registrar receita de subscrição de plataforma com detalhes de pagamento
+     */
+    @Transactional
+    public void recordPlatformSubscriptionRevenue(
+            UUID providerId, 
+            BigDecimal amount, 
+            String currency, 
+            UUID checkoutSessionId,
+            int holdbackDays,
+            java.util.Map<String, Object> paymentDetails) {
         
         log.info("=== REGISTRANDO RECEITA DE SUBSCRIÇÃO DE PLATAFORMA ===");
         log.info("Provider: {}, Amount: {} {}, CheckoutSession: {}", 
                  providerId, amount, currency, checkoutSessionId);
+        
+        if (paymentDetails != null) {
+            log.info("Payment details: cardBrand={}, cardLast4={}, invoiceNumber={}", 
+                paymentDetails.get("cardBrand"), paymentDetails.get("cardLast4"), paymentDetails.get("invoiceNumber"));
+        }
         
         // Criar evento de receita da plataforma
         RevenueShareEvent event = RevenueShareEvent.builder()
@@ -121,16 +140,44 @@ public class RevenueShareService {
         // Esta transação representa a receita da plataforma vinda da subscription
         ProviderWallet providerWallet = walletService.getOrCreateWallet(providerId);
         
-        WalletTransaction platformTransaction = WalletTransaction.builder()
+        WalletTransaction.WalletTransactionBuilder transactionBuilder = WalletTransaction.builder()
             .wallet(providerWallet)
             .type(TransactionType.DEBIT_PLATFORM_FEE)
             .amount(amount)
             .description("Subscription fee - Platform Plan")
             .referenceId(checkoutSessionId)
             .status(TransactionStatus.COMPLETED)
-            .availableAt(LocalDateTime.now()) // Disponível imediatamente (não tem holdback)
-            .build();
+            .availableAt(LocalDateTime.now()); // Disponível imediatamente (não tem holdback)
         
+        // Adicionar detalhes do pagamento se disponíveis
+        if (paymentDetails != null) {
+            if (paymentDetails.containsKey("paymentIntentId")) {
+                transactionBuilder.stripePaymentIntentId((String) paymentDetails.get("paymentIntentId"));
+            }
+            if (paymentDetails.containsKey("invoiceId")) {
+                transactionBuilder.stripeInvoiceId((String) paymentDetails.get("invoiceId"));
+            }
+            if (paymentDetails.containsKey("invoiceNumber")) {
+                transactionBuilder.stripeInvoiceNumber((String) paymentDetails.get("invoiceNumber"));
+            }
+            if (paymentDetails.containsKey("paymentMethodType")) {
+                transactionBuilder.paymentMethodType((String) paymentDetails.get("paymentMethodType"));
+            }
+            if (paymentDetails.containsKey("cardBrand")) {
+                transactionBuilder.cardBrand((String) paymentDetails.get("cardBrand"));
+            }
+            if (paymentDetails.containsKey("cardLast4")) {
+                transactionBuilder.cardLast4((String) paymentDetails.get("cardLast4"));
+            }
+            if (paymentDetails.containsKey("receiptUrl")) {
+                transactionBuilder.receiptUrl((String) paymentDetails.get("receiptUrl"));
+            }
+            if (paymentDetails.containsKey("invoicePdfUrl")) {
+                transactionBuilder.invoicePdfUrl((String) paymentDetails.get("invoicePdfUrl"));
+            }
+        }
+        
+        WalletTransaction platformTransaction = transactionBuilder.build();
         transactionRepository.save(platformTransaction);
         
         log.info("✅ Transação DEBIT_PLATFORM_FEE criada: amount={} {}, transactionId={}", 

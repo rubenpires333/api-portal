@@ -43,6 +43,32 @@ public class WalletTransaction {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+    
+    // ===== NOVOS CAMPOS PARA DETALHES DO PAGAMENTO =====
+    
+    @Column(name = "stripe_payment_intent_id")
+    private String stripePaymentIntentId; // ID do Payment Intent do Stripe
+    
+    @Column(name = "stripe_invoice_id")
+    private String stripeInvoiceId; // Número da Invoice do Stripe
+    
+    @Column(name = "stripe_invoice_number")
+    private String stripeInvoiceNumber; // Número legível da invoice (ex: INV-1234)
+    
+    @Column(name = "payment_method_type")
+    private String paymentMethodType; // card, sepa_debit, etc
+    
+    @Column(name = "card_brand")
+    private String cardBrand; // visa, mastercard, amex, etc
+    
+    @Column(name = "card_last4")
+    private String cardLast4; // Últimos 4 dígitos do cartão
+    
+    @Column(name = "receipt_url")
+    private String receiptUrl; // URL do recibo do Stripe
+    
+    @Column(name = "invoice_pdf_url")
+    private String invoicePdfUrl; // URL do PDF da invoice
 
     @Column(nullable = false)
     private LocalDateTime availableAt; // createdAt + holdback period

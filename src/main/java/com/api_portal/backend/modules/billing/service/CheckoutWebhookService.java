@@ -1,6 +1,7 @@
 package com.api_portal.backend.modules.billing.service;
 
 import com.api_portal.backend.modules.billing.gateway.dto.WebhookEvent;
+import com.api_portal.backend.modules.billing.gateway.stripe.StripeGateway;
 import com.api_portal.backend.modules.billing.model.CheckoutSession;
 import com.api_portal.backend.modules.billing.model.enums.CheckoutSessionStatus;
 import com.api_portal.backend.modules.billing.repository.CheckoutSessionRepository;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -19,6 +21,7 @@ public class CheckoutWebhookService {
 
     private final CheckoutSessionRepository checkoutSessionRepository;
     private final PlatformSubscriptionService platformSubscriptionService;
+    private final StripeGateway stripeGateway;
 
     @Transactional
     public void processCheckoutCompleted(WebhookEvent event) {
@@ -137,8 +140,22 @@ public class CheckoutWebhookService {
         
         log.info("Sessão atualizada para COMPLETED: id={}", session.getId());
         
+        // Capturar detalhes do pagamento do Stripe
+        Map<String, Object> paymentDetails = null;
+        if (event.getPaymentId() != null) {
+            try {
+                log.info("Buscando detalhes do pagamento do Stripe...");
+                paymentDetails = stripeGateway.getPaymentIntentDetails(event.getPaymentId());
+                log.info("✅ Detalhes do pagamento capturados: cardBrand={}, cardLast4={}, invoiceNumber={}", 
+                    paymentDetails.get("cardBrand"), paymentDetails.get("cardLast4"), paymentDetails.get("invoiceNumber"));
+            } catch (Exception e) {
+                log.warn("⚠️ Não foi possível buscar detalhes do pagamento: {}", e.getMessage());
+                // Continuar sem os detalhes - não é crítico
+            }
+        }
+        
         try {
-            platformSubscriptionService.activateSubscription(session, event);
+            platformSubscriptionService.activateSubscription(session, event, paymentDetails);
             log.info("✅ Subscrição ativada com sucesso: sessionId={}", session.getId());
         } catch (Exception e) {
             log.error("❌ Erro ao ativar subscrição: sessionId={}", session.getId(), e);

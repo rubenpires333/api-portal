@@ -124,6 +124,13 @@ public class PlatformSubscriptionService {
     @Transactional
     public void activateSubscription(com.api_portal.backend.modules.billing.model.CheckoutSession session, 
                                      WebhookEvent event) {
+        activateSubscription(session, event, null);
+    }
+    
+    @Transactional
+    public void activateSubscription(com.api_portal.backend.modules.billing.model.CheckoutSession session, 
+                                     WebhookEvent event,
+                                     java.util.Map<String, Object> paymentDetails) {
         log.info("=== ATIVANDO SUBSCRIÇÃO ===");
         log.info("Session ID: {}", session.getId());
         log.info("Provider ID: {}", session.getProviderId());
@@ -131,6 +138,11 @@ public class PlatformSubscriptionService {
         log.info("Session StripeSubscriptionId: {}", session.getStripeSubscriptionId());
         log.info("Event CustomerId: {}", event.getCustomerId());
         log.info("Event SubscriptionId: {}", event.getSubscriptionId());
+        
+        if (paymentDetails != null) {
+            log.info("Payment details disponíveis: cardBrand={}, cardLast4={}, invoiceNumber={}", 
+                paymentDetails.get("cardBrand"), paymentDetails.get("cardLast4"), paymentDetails.get("invoiceNumber"));
+        }
         
         PlatformPlan plan = planRepository.findById(session.getPlanId())
             .orElseThrow(() -> new RuntimeException("Plan not found: " + session.getPlanId()));
@@ -193,7 +205,8 @@ public class PlatformSubscriptionService {
             subscriptionAmount,
             session.getCurrency(),
             session.getId(),
-            holdbackDays
+            holdbackDays,
+            paymentDetails  // Passar detalhes do pagamento
         );
         
         log.info("✅ Subscrição ativada com sucesso: providerId={}", session.getProviderId());
