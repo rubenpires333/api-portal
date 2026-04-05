@@ -117,6 +117,24 @@ public class RevenueShareService {
         
         revenueShareEventRepository.save(event);
         
+        // IMPORTANTE: Criar transação DEBIT_PLATFORM_FEE para a plataforma
+        // Esta transação representa a receita da plataforma vinda da subscription
+        ProviderWallet providerWallet = walletService.getOrCreateWallet(providerId);
+        
+        WalletTransaction platformTransaction = WalletTransaction.builder()
+            .wallet(providerWallet)
+            .type(TransactionType.DEBIT_PLATFORM_FEE)
+            .amount(amount)
+            .description("Subscription fee - Platform Plan")
+            .referenceId(checkoutSessionId)
+            .status(TransactionStatus.COMPLETED)
+            .availableAt(LocalDateTime.now()) // Disponível imediatamente (não tem holdback)
+            .build();
+        
+        transactionRepository.save(platformTransaction);
+        
+        log.info("✅ Transação DEBIT_PLATFORM_FEE criada: amount={} {}, transactionId={}", 
+                 amount, currency, platformTransaction.getId());
         log.info("✅ Receita de subscrição de plataforma registrada: amount={} {}", amount, currency);
         log.info("=== FIM REGISTRO RECEITA SUBSCRIÇÃO PLATAFORMA ===");
     }
